@@ -1,0 +1,5 @@
+{
+  "name": "BetSlate AI Automator",
+  "description": "Automate table tennis betting slates using AI. Upload a screenshot of the slate, parse the bets, visualize Discord messages, and track unit profitability.",
+  "requestFramePermissions": []
+}
