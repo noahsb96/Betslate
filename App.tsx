@@ -28,7 +28,7 @@ const App: React.FC = () => {
   const [authError, setAuthError] = useState<string | null>(null);
 
   // --- APP STATE ---
-  const [apiKey, setApiKey] = useState<string>(process.env.API_KEY || '');
+  const [apiKey, setApiKey] = useState<string>('');
   const [bets, setBets] = useState<Bet[]>([]);
   const [loading, setLoading] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -50,8 +50,11 @@ const App: React.FC = () => {
     if (currentUser) {
        localStorage.setItem(`bets_${currentUser}`, JSON.stringify(bets));
        localStorage.setItem(`settings_${currentUser}`, JSON.stringify(appSettings));
+       if (apiKey) {
+         localStorage.setItem(`apiKey_${currentUser}`, apiKey);
+       }
     }
-  }, [bets, appSettings, currentUser]);
+  }, [bets, appSettings, currentUser, apiKey]);
 
   // --- AUTH HANDLERS ---
   const handleLoginSuccess = (username: string) => {
@@ -61,12 +64,20 @@ const App: React.FC = () => {
      // Load User Data
      const savedBets = localStorage.getItem(`bets_${username}`);
      const savedSettings = localStorage.getItem(`settings_${username}`);
+     const savedApiKey = localStorage.getItem(`apiKey_${username}`);
      
      if (savedBets) setBets(JSON.parse(savedBets));
      else setBets([]);
      
      if (savedSettings) setAppSettings(JSON.parse(savedSettings));
      else setAppSettings(DEFAULT_SETTINGS);
+
+     if (savedApiKey) setApiKey(savedApiKey);
+     else {
+       // Load from environment as fallback
+       const envApiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
+       if (envApiKey) setApiKey(envApiKey);
+     }
 
      setAuthUsername('');
      setAuthPassword('');
@@ -166,6 +177,7 @@ const App: React.FC = () => {
       return;
     }
     
+    console.log('Using API Key:', apiKey?.substring(0, 10) + '...');
     setLoading(true);
     setError(null);
     
@@ -178,8 +190,10 @@ const App: React.FC = () => {
             isPosted: false
         }));
         setBets(prev => [...processedBets, ...prev]);
-    } catch (err) {
-      setError("Failed to analyze image. Please try again.");
+    } catch (err: any) {
+      console.error('Image analysis error:', err);
+      const errorMsg = err?.message || err?.toString() || "Failed to analyze image. Please try again.";
+      setError(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -376,6 +390,18 @@ const App: React.FC = () => {
             </h3>
             <div className="space-y-4">
                
+               <div>
+                 <label className="block text-sm text-gray-400 mb-1">Gemini API Key</label>
+                 <input 
+                   type="password" 
+                   value={apiKey}
+                   onChange={(e) => setApiKey(e.target.value)}
+                   placeholder="Enter your Gemini API key"
+                   className="w-full bg-[#202225] border border-gray-700 rounded p-2 text-white focus:outline-none focus:border-blue-500"
+                 />
+                 <p className="text-xs text-gray-500 mt-1">Get your API key from <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-blue-400 hover:underline">Google AI Studio</a></p>
+               </div>
+
                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm text-gray-400 mb-1">Bot Name</label>

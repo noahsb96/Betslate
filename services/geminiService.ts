@@ -37,13 +37,15 @@ export const analyzeSlateImage = async (base64Image: string, apiKey: string): Pr
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: {
-        parts: [
-          { inlineData: { mimeType: "image/png", data: cleanBase64 } },
-          { text: "Extract the table tennis bets from this image." },
-        ],
-      },
+      model: "gemini-flash-latest",
+      contents: [
+        {
+          parts: [
+            { inlineData: { mimeType: "image/png", data: cleanBase64 } },
+            { text: "Extract the table tennis bets from this image." },
+          ],
+        }
+      ],
       config: {
         systemInstruction: SLATE_SYSTEM_INSTRUCTION,
         responseMimeType: "application/json",
