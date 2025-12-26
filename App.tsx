@@ -247,37 +247,14 @@ const App: React.FC = () => {
             <div className="space-y-4">
                
                <div>
-                 <label className="block text-sm text-gray-400 mb-1">Gemini API Key</label>
+                 <label className="block text-sm text-gray-400 mb-1">Mention String</label>
                  <input 
-                   type="password" 
-                   value={apiKey}
-                   onChange={(e) => setApiKey(e.target.value)}
-                   placeholder="Enter your Gemini API key"
+                   type="text" 
+                   value={appSettings.mentionString}
+                   onChange={(e) => setAppSettings({...appSettings, mentionString: e.target.value})}
+                   placeholder="<@&12345678>"
                    className="w-full bg-[#202225] border border-gray-700 rounded p-2 text-white focus:outline-none focus:border-blue-500"
                  />
-                 <p className="text-xs text-gray-500 mt-1">Get your API key from <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-blue-400 hover:underline">Google AI Studio</a></p>
-               </div>
-
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm text-gray-400 mb-1">Bot Name</label>
-                    <input 
-                      type="text" 
-                      value={appSettings.botName}
-                      onChange={(e) => setAppSettings({...appSettings, botName: e.target.value})}
-                      className="w-full bg-[#202225] border border-gray-700 rounded p-2 text-white focus:outline-none focus:border-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm text-gray-400 mb-1">Mention String</label>
-                    <input 
-                      type="text" 
-                      value={appSettings.mentionString}
-                      onChange={(e) => setAppSettings({...appSettings, mentionString: e.target.value})}
-                      placeholder="<@&12345678>"
-                      className="w-full bg-[#202225] border border-gray-700 rounded p-2 text-white focus:outline-none focus:border-blue-500"
-                    />
-                  </div>
                </div>
 
                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -319,7 +296,7 @@ const App: React.FC = () => {
                <div>
                  <label className="block text-sm text-gray-400 mb-1">Discord Webhook URL (Plays)</label>
                  <input 
-                   type="password" 
+                   type="text" 
                    value={appSettings.discordWebhookUrl}
                    onChange={(e) => setAppSettings({...appSettings, discordWebhookUrl: e.target.value})}
                    className="w-full bg-[#202225] border border-gray-700 rounded p-2 text-white focus:outline-none focus:border-blue-500"
@@ -329,20 +306,10 @@ const App: React.FC = () => {
                <div>
                  <label className="block text-sm text-gray-400 mb-1">Discord Webhook URL (Recaps - Optional)</label>
                  <input 
-                   type="password" 
+                   type="text" 
                    value={appSettings.recapWebhookUrl}
                    onChange={(e) => setAppSettings({...appSettings, recapWebhookUrl: e.target.value})}
                    placeholder="Leave empty to use main webhook"
-                   className="w-full bg-[#202225] border border-gray-700 rounded p-2 text-white focus:outline-none focus:border-blue-500"
-                 />
-               </div>
-               
-               <div>
-                 <label className="block text-sm text-gray-400 mb-1">Bot Avatar URL</label>
-                 <input 
-                   type="text" 
-                   value={appSettings.botAvatarUrl}
-                   onChange={(e) => setAppSettings({...appSettings, botAvatarUrl: e.target.value})}
                    className="w-full bg-[#202225] border border-gray-700 rounded p-2 text-white focus:outline-none focus:border-blue-500"
                  />
                </div>
