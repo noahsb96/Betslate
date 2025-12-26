@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Settings, RefreshCw, Trash, Plus, Calendar, Clock, PlayCircle, Layers, FileText, X, User, Image as ImageIcon, LogOut, Shield } from 'lucide-react';
+import { Settings, RefreshCw, Trash, Plus, Calendar, Clock, Layers, FileText, X } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import Uploader from './components/Uploader';
 import BetCard from './components/BetCard';
@@ -20,13 +20,6 @@ const DEFAULT_SETTINGS: AppSettings = {
 };
 
 const App: React.FC = () => {
-  // --- AUTH STATE ---
-  const [currentUser, setCurrentUser] = useState<string | null>(null);
-  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
-  const [authUsername, setAuthUsername] = useState('');
-  const [authPassword, setAuthPassword] = useState('');
-  const [authError, setAuthError] = useState<string | null>(null);
-
   // --- APP STATE ---
   const [apiKey, setApiKey] = useState<string>('');
   const [bets, setBets] = useState<Bet[]>([]);
@@ -37,91 +30,30 @@ const App: React.FC = () => {
   const [slateDate, setSlateDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [appSettings, setAppSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
 
-  // --- EFFECT: LOAD SESSION ---
+  // --- EFFECT: LOAD DATA ---
   useEffect(() => {
-     const sessionUser = localStorage.getItem('sessionUser');
-     if (sessionUser) {
-        handleLoginSuccess(sessionUser);
-     }
-  }, []);
-
-  // --- EFFECT: SAVE DATA ---
-  useEffect(() => {
-    if (currentUser) {
-       localStorage.setItem(`bets_${currentUser}`, JSON.stringify(bets));
-       localStorage.setItem(`settings_${currentUser}`, JSON.stringify(appSettings));
-       if (apiKey) {
-         localStorage.setItem(`apiKey_${currentUser}`, apiKey);
-       }
-    }
-  }, [bets, appSettings, currentUser, apiKey]);
-
-  // --- AUTH HANDLERS ---
-  const handleLoginSuccess = (username: string) => {
-     setCurrentUser(username);
-     localStorage.setItem('sessionUser', username);
-     
-     // Load User Data
-     const savedBets = localStorage.getItem(`bets_${username}`);
-     const savedSettings = localStorage.getItem(`settings_${username}`);
-     const savedApiKey = localStorage.getItem(`apiKey_${username}`);
+     const savedBets = localStorage.getItem('bets');
+     const savedSettings = localStorage.getItem('settings');
+     const savedApiKey = localStorage.getItem('apiKey');
      
      if (savedBets) setBets(JSON.parse(savedBets));
-     else setBets([]);
-     
      if (savedSettings) setAppSettings(JSON.parse(savedSettings));
-     else setAppSettings(DEFAULT_SETTINGS);
-
      if (savedApiKey) setApiKey(savedApiKey);
      else {
        // Load from environment as fallback
        const envApiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
        if (envApiKey) setApiKey(envApiKey);
      }
+  }, []);
 
-     setAuthUsername('');
-     setAuthPassword('');
-     setAuthError(null);
-  };
-
-  const handleAuthSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!authUsername || !authPassword) {
-        setAuthError("Username and password required");
-        return;
+  // --- EFFECT: SAVE DATA ---
+  useEffect(() => {
+    localStorage.setItem('bets', JSON.stringify(bets));
+    localStorage.setItem('settings', JSON.stringify(appSettings));
+    if (apiKey) {
+      localStorage.setItem('apiKey', apiKey);
     }
-
-    const storedUser = localStorage.getItem(`user_${authUsername}`);
-
-    if (authMode === 'register') {
-        if (storedUser) {
-            setAuthError("Username already exists");
-            return;
-        }
-        // Register new user
-        localStorage.setItem(`user_${authUsername}`, JSON.stringify({ password: authPassword }));
-        handleLoginSuccess(authUsername);
-    } else {
-        // Login
-        if (!storedUser) {
-            setAuthError("User not found");
-            return;
-        }
-        const userObj = JSON.parse(storedUser);
-        if (userObj.password !== authPassword) {
-            setAuthError("Invalid password");
-            return;
-        }
-        handleLoginSuccess(authUsername);
-    }
-  };
-
-  const handleLogout = () => {
-    setCurrentUser(null);
-    localStorage.removeItem('sessionUser');
-    setBets([]);
-    setAppSettings(DEFAULT_SETTINGS);
-  };
+  }, [bets, appSettings, apiKey]);
 
   // --- SCHEDULER LOGIC ---
   useEffect(() => {
@@ -282,65 +214,6 @@ const App: React.FC = () => {
   const queueBets = bets.filter(b => !b.isPosted);
   const historyBets = bets.filter(b => b.isPosted);
 
-  // --- RENDER LOGIN SCREEN ---
-  if (!currentUser) {
-      return (
-          <div className="min-h-screen bg-[#36393f] flex items-center justify-center p-4">
-              <div className="bg-[#202225] p-8 rounded-lg shadow-xl w-full max-w-md border border-gray-700">
-                  <div className="flex justify-center mb-6">
-                      <div className="w-16 h-16 bg-indigo-600 rounded-xl flex items-center justify-center font-bold text-white text-2xl shadow-lg shadow-indigo-500/50">
-                        TC
-                     </div>
-                  </div>
-                  <h2 className="text-2xl font-bold text-white text-center mb-1">The Commissioner</h2>
-                  <p className="text-gray-400 text-center text-sm mb-6">Automated Sports Betting Manager</p>
-                  
-                  {authError && (
-                      <div className="bg-red-500/10 border border-red-500 text-red-200 p-3 rounded text-sm mb-4 text-center">
-                          {authError}
-                      </div>
-                  )}
-
-                  <form onSubmit={handleAuthSubmit} className="space-y-4">
-                      <div>
-                          <label className="block text-xs uppercase text-gray-400 font-bold mb-1">Username</label>
-                          <input 
-                            type="text" 
-                            className="w-full bg-[#2f3136] border border-gray-600 rounded p-2 text-white focus:border-indigo-500 focus:outline-none"
-                            value={authUsername}
-                            onChange={(e) => setAuthUsername(e.target.value)}
-                          />
-                      </div>
-                      <div>
-                          <label className="block text-xs uppercase text-gray-400 font-bold mb-1">Password</label>
-                          <input 
-                            type="password" 
-                            className="w-full bg-[#2f3136] border border-gray-600 rounded p-2 text-white focus:border-indigo-500 focus:outline-none"
-                            value={authPassword}
-                            onChange={(e) => setAuthPassword(e.target.value)}
-                          />
-                      </div>
-                      <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded transition-colors">
-                          {authMode === 'login' ? 'Login' : 'Create Account'}
-                      </button>
-                  </form>
-                  
-                  <div className="mt-4 text-center">
-                      <button 
-                        onClick={() => {
-                            setAuthMode(authMode === 'login' ? 'register' : 'login');
-                            setAuthError(null);
-                        }}
-                        className="text-sm text-blue-400 hover:text-blue-300 underline"
-                      >
-                          {authMode === 'login' ? 'Need an account? Register' : 'Have an account? Login'}
-                      </button>
-                  </div>
-              </div>
-          </div>
-      );
-  }
-
   // --- RENDER MAIN APP ---
   return (
     <div className="min-h-screen bg-[#36393f] font-sans text-gray-100 pb-20">
@@ -353,11 +226,6 @@ const App: React.FC = () => {
              </div>
             <div>
               <h1 className="text-xl font-bold text-white leading-tight">The Commissioner</h1>
-              <div className="flex items-center space-x-2">
-                 <div className="text-[10px] bg-gray-700 px-2 py-0.5 rounded text-gray-300 flex items-center">
-                    <User size={10} className="mr-1"/> {currentUser}
-                 </div>
-              </div>
             </div>
           </div>
           <div className="flex items-center space-x-2">
@@ -367,13 +235,6 @@ const App: React.FC = () => {
                 title="Settings"
             >
                 <Settings size={20} />
-            </button>
-            <button 
-                onClick={handleLogout}
-                className="p-2 text-red-400 hover:text-red-200 hover:bg-gray-700 rounded-full transition-colors"
-                title="Logout"
-            >
-                <LogOut size={20} />
             </button>
           </div>
         </div>
