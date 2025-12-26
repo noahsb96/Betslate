@@ -62,7 +62,6 @@ const App: React.FC = () => {
              : (bet.matchTimestamp ? bet.matchTimestamp - (appSettings.scheduleOffsetMinutes * 60 * 1000) : null);
           
           if (postTime && now >= postTime) {
-            console.log(`Auto-posting bet: ${bet.playerA} vs ${bet.playerB}`);
             const success = await handlePostToDiscord(bet);
             if (success) {
               handleUpdateBet(bet.id, { isPosted: true, autoPost: false }); 
@@ -90,8 +89,11 @@ const App: React.FC = () => {
 
       const isoTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:00`;
       const fullDateTimeStr = `${dateStr}T${isoTime}`;
-      const localDate = new Date(fullDateTimeStr); 
-      return localDate.getTime(); 
+      
+      const localDate = new Date(fullDateTimeStr);
+      const timestamp = localDate.getTime();
+      
+      return timestamp; 
     } catch (e) {
       return undefined;
     }
