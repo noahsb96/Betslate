@@ -20,7 +20,6 @@ const DEFAULT_SETTINGS: AppSettings = {
 };
 
 const App: React.FC = () => {
-  // --- APP STATE ---
   const [apiKey, setApiKey] = useState<string>('');
   const [bets, setBets] = useState<Bet[]>([]);
   const [loading, setLoading] = useState(false);
@@ -30,7 +29,6 @@ const App: React.FC = () => {
   const [slateDate, setSlateDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [appSettings, setAppSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
 
-  // --- EFFECT: LOAD DATA ---
   useEffect(() => {
      const savedBets = localStorage.getItem('bets');
      const savedSettings = localStorage.getItem('settings');
@@ -40,13 +38,11 @@ const App: React.FC = () => {
      if (savedSettings) setAppSettings(JSON.parse(savedSettings));
      if (savedApiKey) setApiKey(savedApiKey);
      else {
-       // Load from environment as fallback
        const envApiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
        if (envApiKey) setApiKey(envApiKey);
      }
   }, []);
 
-  // --- EFFECT: SAVE DATA ---
   useEffect(() => {
     localStorage.setItem('bets', JSON.stringify(bets));
     localStorage.setItem('settings', JSON.stringify(appSettings));
@@ -55,7 +51,6 @@ const App: React.FC = () => {
     }
   }, [bets, appSettings, apiKey]);
 
-  // --- SCHEDULER LOGIC ---
   useEffect(() => {
     const intervalId = setInterval(() => {
       const now = Date.now();
@@ -140,8 +135,9 @@ const App: React.FC = () => {
   };
 
   const clearAllBets = () => {
-    if (window.confirm("Clear all history? This cannot be undone.")) {
-      setBets([]);
+    if (window.confirm("Clear all bets? This cannot be undone.")) {
+      setBets(prev => prev.map(b => ({ ...b, autoPost: false })));
+      setTimeout(() => setBets([]), 0);
     }
   };
   
@@ -214,7 +210,6 @@ const App: React.FC = () => {
   const queueBets = bets.filter(b => !b.isPosted);
   const historyBets = bets.filter(b => b.isPosted);
 
-  // --- RENDER MAIN APP ---
   return (
     <div className="min-h-screen bg-[#36393f] font-sans text-gray-100 pb-20">
       {/* Header */}
@@ -413,6 +408,12 @@ const App: React.FC = () => {
                  <button onClick={handleScheduleAll} className="flex items-center justify-center p-4 bg-[#2f3136] hover:bg-indigo-900/20 hover:border-indigo-500 rounded-lg border border-gray-700 transition-colors">
                     <Clock size={20} className="mr-2 text-indigo-400"/> <span className="font-semibold text-indigo-100">Schedule All</span>
                  </button>
+
+                 {queueBets.length > 0 && (
+                   <button onClick={clearAllBets} className="flex items-center justify-center p-4 bg-[#2f3136] hover:bg-red-900/20 hover:border-red-500 rounded-lg border border-gray-700 transition-colors">
+                      <Trash size={20} className="mr-2 text-red-400"/> <span className="font-semibold text-red-100">Clear All Queue</span>
+                   </button>
+                 )}
               </div>
             </div>
 
