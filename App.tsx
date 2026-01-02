@@ -6,6 +6,7 @@ import Uploader from './components/Uploader';
 import BetCard from './components/BetCard';
 import StatsOverview from './components/StatsOverview';
 import { analyzeSlateImage } from './services/geminiService';
+import { betsAPI, settingsAPI } from './services/api';
 import { Bet, BetResult, AppSettings } from './types';
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -30,49 +31,36 @@ const App: React.FC = () => {
   const [appSettings, setAppSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
 
   useEffect(() => {
-     const savedBets = localStorage.getItem('bets');
-     const savedSettings = localStorage.getItem('settings');
-     const savedApiKey = localStorage.getItem('apiKey');
-     
-     if (savedBets) setBets(JSON.parse(savedBets));
-     if (savedSettings) setAppSettings(JSON.parse(savedSettings));
-     if (savedApiKey) setApiKey(savedApiKey);
-     else {
+     const loadData = async () => {
+       try {
+         const [betsData, settingsData] = await Promise.all([
+           betsAPI.getAll(),
+           settingsAPI.get()
+         ]);
+         setBets(betsData);
+         setAppSettings(settingsData);
+       } catch (err) {
+         console.error('Failed to load data:', err);
+       }
+       
        const envApiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
        if (envApiKey) setApiKey(envApiKey);
-     }
+     };
+     loadData();
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('bets', JSON.stringify(bets));
-    localStorage.setItem('settings', JSON.stringify(appSettings));
-    if (apiKey) {
-      localStorage.setItem('apiKey', apiKey);
-    }
-  }, [bets, appSettings, apiKey]);
-
-  useEffect(() => {
-    const intervalId = setInterval(() => {
-      const now = Date.now();
-      
-      bets.forEach(async (bet) => {
-        if (bet.autoPost && !bet.isPosted) {
-          const postTime = bet.customScheduleTime 
-             ? bet.customScheduleTime 
-             : (bet.matchTimestamp ? bet.matchTimestamp - (appSettings.scheduleOffsetMinutes * 60 * 1000) : null);
-          
-          if (postTime && now >= postTime) {
-            const success = await handlePostToDiscord(bet);
-            if (success) {
-              handleUpdateBet(bet.id, { isPosted: true, autoPost: false }); 
-            }
-          }
+    const saveSettings = async () => {
+      if (appSettings !== DEFAULT_SETTINGS) {
+        try {
+          await settingsAPI.update(appSettings);
+        } catch (err) {
+          console.error('Failed to save settings:', err);
         }
-      });
-    }, 10000); 
-
-    return () => clearInterval(intervalId);
-  }, [bets, appSettings]);
+      }
+    };
+    saveSettings();
+  }, [appSettings]);
 
   const parseMatchTime = (timeString: string, dateStr: string, timezone: string): number | undefined => {
     try {
@@ -118,6 +106,9 @@ const App: React.FC = () => {
             autoPost: false,
             isPosted: false
         }));
+        for (const bet of processedBets) {
+          await betsAPI.create(bet);
+        }
         setBets(prev => [...processedBets, ...prev]);
     } catch (err: any) {
       console.error('Image analysis error:', err);
@@ -128,22 +119,24 @@ const App: React.FC = () => {
     }
   };
 
-  const handleUpdateBet = (id: string, updates: Partial<Bet>) => {
+  const handleUpdateBet = async (id: string, updates: Partial<Bet>) => {
+    await betsAPI.update(id, updates);
     setBets(prev => prev.map(b => b.id === id ? { ...b, ...updates } : b));
   };
 
-  const handleDeleteBet = (id: string) => {
+  const handleDeleteBet = async (id: string) => {
+    await betsAPI.delete(id);
     setBets(prev => prev.filter(b => b.id !== id));
   };
 
-  const clearAllBets = () => {
+  const clearAllBets = async () => {
     if (window.confirm("Clear all bets? This cannot be undone.")) {
-      setBets(prev => prev.map(b => ({ ...b, autoPost: false })));
-      setTimeout(() => setBets([]), 0);
+      await betsAPI.clearAll();
+      setBets([]);
     }
   };
   
-  const handleManualAdd = () => {
+  const handleManualAdd = async () => {
      const newBet: Bet = {
          id: uuidv4(),
          league: 'Manual Entry',
@@ -158,69 +151,29 @@ const App: React.FC = () => {
          isPosted: false,
          matchTimestamp: parseMatchTime('12:00 PM', slateDate, appSettings.slateTimezone)
      };
+     await betsAPI.create(newBet);
      setBets(prev => [newBet, ...prev]);
   };
 
-  const handleScheduleAll = () => {
+  const handleScheduleAll = async () => {
     const confirm = window.confirm(`Schedule all queued bets to auto-post ${appSettings.scheduleOffsetMinutes} mins before start?`);
     if (confirm) {
+      const updatePromises: Promise<void>[] = [];
       setBets(prev => prev.map(b => {
         if (!b.isPosted && b.matchTimestamp && b.matchTimestamp > Date.now()) {
+          updatePromises.push(betsAPI.update(b.id, { autoPost: true }));
           return { ...b, autoPost: true };
         }
         return b;
       }));
+      await Promise.all(updatePromises);
     }
   };
 
   const handlePostToDiscord = async (bet: Bet): Promise<boolean> => {
-    if (!appSettings.discordWebhookUrl) return false;
-
-    let mentionContent = appSettings.mentionString || "";
-    if (mentionContent && /^\d+$/.test(mentionContent.trim())) {
-      mentionContent = `<@&${mentionContent.trim()}>`;
-    }
-
-    const roleIds: string[] = [];
-    const roleMatches = mentionContent.matchAll(/<@&(\d+)>/g);
-    for (const match of roleMatches) {
-      roleIds.push(match[1]);
-    }
-
-    const payload = {
-      username: appSettings.botName || "The Commissioner",
-      avatar_url: appSettings.botAvatarUrl || undefined,
-      content: mentionContent,
-      allowed_mentions: { 
-        parse: roleIds.length > 0 ? [] : ["users", "roles"],
-        roles: roleIds
-      }, 
-      embeds: [
-        {
-          title: "📢 Bet Alert",
-          color: 16731469, 
-          fields: [
-            { name: "Match", value: `${bet.playerA} vs ${bet.playerB}`, inline: false },
-            { name: "Type", value: bet.type, inline: true },
-            { name: "Units", value: `${bet.units}u (${bet.odds || appSettings.defaultOdds})`, inline: true },
-            { name: "League", value: bet.league, inline: true },
-            { name: "Start Time", value: `${bet.time} EST`, inline: false }
-          ]
-        }
-      ]
-    };
-
-    try {
-      const response = await fetch(appSettings.discordWebhookUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      return response.ok;
-    } catch (e) {
-      console.error("Discord Webhook Error:", e);
-      return false;
-    }
+    await betsAPI.update(bet.id, { isPosted: true });
+    setBets(prev => prev.map(b => b.id === bet.id ? { ...b, isPosted: true } : b));
+    return true;
   };
 
   const queueBets = bets.filter(b => !b.isPosted);
