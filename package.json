@@ -8,7 +8,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "server": "node server/index.js",
-    "server:dev": "node --watch server/index.js"
+    "server:dev": "node --watch server/index.js",
+    "start": "node server/index.js",
+    "start:full": "npm run build && npm run server"
   },
   "dependencies": {
     "@google/genai": "^1.34.0",
