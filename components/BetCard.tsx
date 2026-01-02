@@ -49,12 +49,6 @@ const BetCard: React.FC<BetCardProps> = ({ bet, settings, onUpdate, onDelete, on
     }
   };
 
-  const openSofascore = () => {
-    // Basic search on Sofascore
-    const query = `${bet.playerA} ${bet.playerB}`;
-    window.open(`https://www.sofascore.com/search?q=${encodeURIComponent(query)}`, '_blank');
-  };
-
   const getStatusColor = (result: BetResult) => {
     switch (result) {
       case BetResult.WIN: return 'border-green-500 bg-green-500/10';
@@ -64,7 +58,6 @@ const BetCard: React.FC<BetCardProps> = ({ bet, settings, onUpdate, onDelete, on
     }
   };
 
-  // Determine the effective scheduled time
   const effectiveTime = bet.customScheduleTime 
     ? bet.customScheduleTime 
     : (bet.matchTimestamp ? bet.matchTimestamp - (settings.scheduleOffsetMinutes * 60000) : 0);
@@ -251,15 +244,6 @@ const BetCard: React.FC<BetCardProps> = ({ bet, settings, onUpdate, onDelete, on
         {/* Result Tracking Buttons (Only show if posted) */}
         {bet.isPosted && (
           <div className="flex items-center space-x-2 mt-3 animate-fade-in flex-wrap gap-y-2">
-             {/* Sofascore Helper Link */}
-             <button 
-               onClick={openSofascore}
-               className="flex items-center px-2 py-1 bg-[#202225] border border-gray-600 rounded text-xs text-blue-400 hover:text-white hover:border-blue-500 mr-2"
-               title="Search Result on Sofascore"
-             >
-               <ExternalLink size={12} className="mr-1"/> Grade
-             </button>
-
             <button 
               onClick={() => onUpdate(bet.id, { result: BetResult.WIN })}
               className={`flex items-center px-3 py-1 rounded text-xs font-medium transition-colors ${bet.result === BetResult.WIN ? 'bg-green-600 text-white' : 'bg-[#4f545c] text-gray-300 hover:bg-green-700'}`}

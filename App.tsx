@@ -176,11 +176,25 @@ const App: React.FC = () => {
   const handlePostToDiscord = async (bet: Bet): Promise<boolean> => {
     if (!appSettings.discordWebhookUrl) return false;
 
+    let mentionContent = appSettings.mentionString || "";
+    if (mentionContent && /^\d+$/.test(mentionContent.trim())) {
+      mentionContent = `<@&${mentionContent.trim()}>`;
+    }
+
+    const roleIds: string[] = [];
+    const roleMatches = mentionContent.matchAll(/<@&(\d+)>/g);
+    for (const match of roleMatches) {
+      roleIds.push(match[1]);
+    }
+
     const payload = {
       username: appSettings.botName || "The Commissioner",
       avatar_url: appSettings.botAvatarUrl || undefined,
-      content: appSettings.mentionString || "",
-      allowed_mentions: { parse: ["users", "roles"] }, 
+      content: mentionContent,
+      allowed_mentions: { 
+        parse: roleIds.length > 0 ? [] : ["users", "roles"],
+        roles: roleIds
+      }, 
       embeds: [
         {
           title: "📢 Bet Alert",
@@ -249,14 +263,15 @@ const App: React.FC = () => {
             <div className="space-y-4">
                
                <div>
-                 <label className="block text-sm text-gray-400 mb-1">Mention String</label>
+                 <label className="block text-sm text-gray-400 mb-1">Role to Mention (Role ID)</label>
                  <input 
                    type="text" 
                    value={appSettings.mentionString}
                    onChange={(e) => setAppSettings({...appSettings, mentionString: e.target.value})}
-                   placeholder="<@&12345678>"
+                   placeholder="1456488731832750141"
                    className="w-full bg-[#202225] border border-gray-700 rounded p-2 text-white focus:outline-none focus:border-blue-500"
                  />
+                 <p className="text-xs text-gray-500 mt-1">Right-click role → Copy Role ID in Discord</p>
                </div>
 
                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

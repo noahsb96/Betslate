@@ -21,16 +21,13 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({ bets, settings, onUpdateS
   const losses = finishedBets.filter(b => b.result === BetResult.LOSS).length;
   const pushes = finishedBets.filter(b => b.result === BetResult.PUSH).length;
   
-  // Odds Calculator Helper
   const calculateProfit = (units: number, oddsStr?: string) => {
     const odds = parseInt(oddsStr || settings.defaultOdds || '-120');
-    if (isNaN(odds)) return 0; // Fallback
+    if (isNaN(odds)) return 0;
 
     if (odds > 0) {
-      // Positive odds (e.g., +150): Profit = Units * (Odds / 100)
       return units * (odds / 100);
     } else {
-      // Negative odds (e.g., -120): Profit = Units * (100 / Math.abs(odds));
       return units * (100 / Math.abs(odds));
     }
   };
@@ -52,7 +49,6 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({ bets, settings, onUpdateS
     { name: 'Push', value: pushes, color: '#eab308' },
   ].filter(d => d.value > 0);
 
-  // League Performance with exact odds
   const leagueStats: Record<string, number> = {};
   finishedBets.forEach(bet => {
     if (!leagueStats[bet.league]) leagueStats[bet.league] = 0;
@@ -65,7 +61,6 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({ bets, settings, onUpdateS
     units: parseFloat(leagueStats[league].toFixed(2))
   }));
 
-  // Recap Scheduler Logic
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
     if (recapScheduled && recapTime) {
@@ -75,7 +70,7 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({ bets, settings, onUpdateS
         
         if (now.getHours() === targetHours && now.getMinutes() === targetMinutes && now.getSeconds() < 10) {
           await handleSendRecap();
-          setRecapScheduled(false); // Only run once per day setting
+          setRecapScheduled(false);
         }
       }, 5000);
     }
@@ -95,7 +90,7 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({ bets, settings, onUpdateS
         avatar_url: settings.botAvatarUrl,
         embeds: [{
             title: `📅 Daily Recap - ${new Date().toLocaleDateString()}`,
-            color: netUnits >= 0 ? 5763719 : 15548997, // Green or Red
+            color: netUnits >= 0 ? 5763719 : 15548997,
             fields: [
                 { name: "Record", value: `${wins}-${losses}-${pushes}`, inline: true },
                 { name: "Net Units", value: `${netUnits > 0 ? '+' : ''}${formattedNetUnits}u`, inline: true },

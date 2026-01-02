@@ -11,17 +11,16 @@ export interface Bet {
   league: string;
   playerA: string;
   playerB: string;
-  time: string; // Original string from image
-  type: string; // e.g., "UNDER 75.5", "SPLIT"
+  time: string;
+  type: string;
   units: number;
-  odds?: string; // e.g. "-120", "+100"
+  odds?: string;
   result: BetResult;
   notes?: string;
-  timestamp: number; // Creation time
+  timestamp: number;
   
-  // Scheduling fields
-  matchTimestamp?: number; // The calculated Date object of the match (based on slate settings)
-  customScheduleTime?: number; // If set, overrides the automatic offset calculation
+  matchTimestamp?: number;
+  customScheduleTime?: number;
   autoPost: boolean;
   isPosted: boolean;
 }
@@ -29,16 +28,16 @@ export interface Bet {
 export interface AppSettings {
   mentionString: string; 
   discordWebhookUrl: string;
-  recapWebhookUrl: string; // Optional separate webhook for recaps
+  recapWebhookUrl: string;
   botName: string;
   botAvatarUrl: string;
   scheduleOffsetMinutes: number; 
   slateTimezone: string;
-  defaultOdds: string; // Global default, e.g., "-120"
+  defaultOdds: string;
 }
 
 export interface UserAccount {
   username: string;
-  passwordHash: string; // Simple hash for demo
+  passwordHash: string;
   settings: AppSettings;
 }
