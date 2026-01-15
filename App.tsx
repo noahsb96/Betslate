@@ -75,48 +75,28 @@ const App: React.FC = () => {
       if (meridian === 'pm' && hours < 12) hours += 12;
       if (meridian === 'am' && hours === 12) hours = 0;
 
-      const isoTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:00`;
+      const [year, month, day] = dateStr.split('-').map(Number);
       
-      const fullDateTimeStr = `${dateStr}T${isoTime}`;
-      const dateInTimezone = new Date(fullDateTimeStr + ' ' + timezone);
+      const utcDate = new Date(Date.UTC(year, month - 1, day, hours, minutes, 0));
       
-      if (isNaN(dateInTimezone.getTime())) {
-        const year = dateStr.split('-')[0];
-        const month = dateStr.split('-')[1];
-        const day = dateStr.split('-')[2];
-        
-        const formatter = new Intl.DateTimeFormat('en-US', {
-          timeZone: timezone === 'EST' || timezone === 'EDT' ? 'America/New_York' :
-                    timezone === 'PST' || timezone === 'PDT' ? 'America/Los_Angeles' :
-                    timezone === 'CST' || timezone === 'CDT' ? 'America/Chicago' :
-                    timezone === 'MST' || timezone === 'MDT' ? 'America/Denver' :
-                    'America/New_York',
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit',
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit',
-          hour12: false
-        });
-        
-        const targetDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), hours, minutes, 0);
-        
-        const utcDate = new Date(targetDate.toLocaleString('en-US', { timeZone: 'UTC' }));
-        const tzDate = new Date(targetDate.toLocaleString('en-US', { 
-          timeZone: timezone === 'EST' || timezone === 'EDT' ? 'America/New_York' :
-                    timezone === 'PST' || timezone === 'PDT' ? 'America/Los_Angeles' :
-                    timezone === 'CST' || timezone === 'CDT' ? 'America/Chicago' :
-                    timezone === 'MST' || timezone === 'MDT' ? 'America/Denver' :
-                    'America/New_York'
-        }));
-        const offset = utcDate.getTime() - tzDate.getTime();
-        
-        return targetDate.getTime() - offset;
-      }
+      const timezoneOffsets = {
+        'EST': 5,
+        'EDT': 4,
+        'CST': 6,
+        'CDT': 5,
+        'MST': 7,
+        'MDT': 6,
+        'PST': 8,
+        'PDT': 7 
+      };
       
-      return dateInTimezone.getTime(); 
+      const offset = timezoneOffsets[timezone] || 5;
+      
+      const timestamp = utcDate.getTime() + (offset * 60 * 60 * 1000);
+      
+      return timestamp;
     } catch (e) {
+      console.error('Error parsing match time:', e);
       return undefined;
     }
   };
