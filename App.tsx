@@ -171,9 +171,62 @@ const App: React.FC = () => {
   };
 
   const handlePostToDiscord = async (bet: Bet): Promise<boolean> => {
-    await betsAPI.update(bet.id, { isPosted: true });
-    setBets(prev => prev.map(b => b.id === bet.id ? { ...b, isPosted: true } : b));
-    return true;
+    if (!appSettings.discordWebhookUrl) {
+      console.error('Discord webhook URL not configured');
+      return false;
+    }
+
+    let mentionContent = appSettings.mentionString || "";
+    if (mentionContent && /^\d+$/.test(mentionContent.trim())) {
+      mentionContent = `<@&${mentionContent.trim()}>`;
+    }
+
+    const roleIds: string[] = [];
+    const roleMatches = mentionContent.matchAll(/<@&(\d+)>/g);
+    for (const match of roleMatches) {
+      roleIds.push(match[1]);
+    }
+
+    const payload = {
+      username: appSettings.botName || "The Commissioner",
+      avatar_url: appSettings.botAvatarUrl || undefined,
+      content: mentionContent,
+      allowed_mentions: { 
+        parse: roleIds.length > 0 ? [] : ["users", "roles"],
+        roles: roleIds
+      }, 
+      embeds: [
+        {
+          title: "📢 Bet Alert",
+          color: 16731469, 
+          fields: [
+            { name: "Match", value: `${bet.playerA} vs ${bet.playerB}`, inline: false },
+            { name: "Type", value: bet.type, inline: true },
+            { name: "Units", value: `${bet.units}u (${bet.odds || appSettings.defaultOdds})`, inline: true },
+            { name: "League", value: bet.league, inline: true },
+            { name: "Start Time", value: `${bet.time} EST`, inline: false }
+          ]
+        }
+      ]
+    };
+
+    try {
+      const response = await fetch(appSettings.discordWebhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      
+      if (response.ok) {
+        await betsAPI.update(bet.id, { isPosted: true });
+        setBets(prev => prev.map(b => b.id === bet.id ? { ...b, isPosted: true } : b));
+        return true;
+      }
+      return false;
+    } catch (e) {
+      console.error("Discord Webhook Error:", e);
+      return false;
+    }
   };
 
   const queueBets = bets.filter(b => !b.isPosted);
