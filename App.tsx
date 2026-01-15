@@ -95,7 +95,7 @@ const App: React.FC = () => {
       
       const offsetDiff = (targetTzOffset - localTzOffset) * 60 * 60 * 1000;
       
-      return localDate.getTime() - offsetDiff;
+      return localDate.getTime() + offsetDiff;
     } catch (e) {
       console.error('Error parsing match time:', e);
       return undefined;
