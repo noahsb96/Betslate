@@ -76,12 +76,46 @@ const App: React.FC = () => {
       if (meridian === 'am' && hours === 12) hours = 0;
 
       const isoTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:00`;
+      
       const fullDateTimeStr = `${dateStr}T${isoTime}`;
+      const dateInTimezone = new Date(fullDateTimeStr + ' ' + timezone);
       
-      const localDate = new Date(fullDateTimeStr);
-      const timestamp = localDate.getTime();
+      if (isNaN(dateInTimezone.getTime())) {
+        const year = dateStr.split('-')[0];
+        const month = dateStr.split('-')[1];
+        const day = dateStr.split('-')[2];
+        
+        const formatter = new Intl.DateTimeFormat('en-US', {
+          timeZone: timezone === 'EST' || timezone === 'EDT' ? 'America/New_York' :
+                    timezone === 'PST' || timezone === 'PDT' ? 'America/Los_Angeles' :
+                    timezone === 'CST' || timezone === 'CDT' ? 'America/Chicago' :
+                    timezone === 'MST' || timezone === 'MDT' ? 'America/Denver' :
+                    'America/New_York',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false
+        });
+        
+        const targetDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), hours, minutes, 0);
+        
+        const utcDate = new Date(targetDate.toLocaleString('en-US', { timeZone: 'UTC' }));
+        const tzDate = new Date(targetDate.toLocaleString('en-US', { 
+          timeZone: timezone === 'EST' || timezone === 'EDT' ? 'America/New_York' :
+                    timezone === 'PST' || timezone === 'PDT' ? 'America/Los_Angeles' :
+                    timezone === 'CST' || timezone === 'CDT' ? 'America/Chicago' :
+                    timezone === 'MST' || timezone === 'MDT' ? 'America/Denver' :
+                    'America/New_York'
+        }));
+        const offset = utcDate.getTime() - tzDate.getTime();
+        
+        return targetDate.getTime() - offset;
+      }
       
-      return timestamp; 
+      return dateInTimezone.getTime(); 
     } catch (e) {
       return undefined;
     }
