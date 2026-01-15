@@ -63,7 +63,17 @@ const BetCard: React.FC<BetCardProps> = ({ bet, settings, onUpdate, onDelete, on
     : (bet.matchTimestamp ? bet.matchTimestamp - (settings.scheduleOffsetMinutes * 60000) : 0);
 
   const scheduleDisplay = effectiveTime > 0 
-    ? new Date(effectiveTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' })
+    ? new Date(effectiveTime).toLocaleTimeString('en-US', { 
+        hour: '2-digit', 
+        minute: '2-digit', 
+        month: 'short', 
+        day: 'numeric',
+        timeZone: settings.slateTimezone === 'EST' || settings.slateTimezone === 'EDT' ? 'America/New_York' :
+                  settings.slateTimezone === 'CST' || settings.slateTimezone === 'CDT' ? 'America/Chicago' :
+                  settings.slateTimezone === 'MST' || settings.slateTimezone === 'MDT' ? 'America/Denver' :
+                  settings.slateTimezone === 'PST' || settings.slateTimezone === 'PDT' ? 'America/Los_Angeles' :
+                  'America/New_York'
+      }) + ` ${settings.slateTimezone || 'EST'}`
     : 'Not Scheduled';
 
   const formatForInput = (timestamp: number) => {
