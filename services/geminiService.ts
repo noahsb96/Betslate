@@ -16,7 +16,7 @@ The image typically contains rows with:
 CRITICAL RULES:
 1. **Units**: 
    - Hammer icon = **1.5** units.
-   - Nuclear/Radioactive icon = **2** units.
+   - Nuclear/Radioactive icon = **3** units.
    - Star or no icon = **1** unit.
 2. **Bet Type**: 
    - If the text explicitly says "UNDER", "OVER", or "SPLIT", use that.
@@ -25,6 +25,8 @@ CRITICAL RULES:
    - Extract the league header.
    - **CLEANING**: If the league starts with "International: ", remove "International: ". (e.g., "International: TT Elite Series" -> "TT Elite Series").
    - If "Czech: Czech Liga Pro" -> "Czech Liga Pro".
+   - **ALLOWED LEAGUES**: Only use one of these 4 leagues: "Czech Liga Pro", "TT Elite Series", "TT Cup", "Setka Cup".
+   - **DEFAULT**: If the league cannot be determined or doesn't match one of the 4 allowed leagues, use "TT Elite Series".
 
 Extract this into a JSON list.
 `;

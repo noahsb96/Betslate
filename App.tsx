@@ -244,20 +244,38 @@ const App: React.FC = () => {
     }
   };
 
-  const queueBets = bets.filter(b => !b.isPosted);
-  const historyBets = bets.filter(b => b.isPosted);
+  const sortBetsByTime = (betsToSort: Bet[]) => {
+    return [...betsToSort].sort((a, b) => {
+      const getEffectiveTime = (bet: Bet) => {
+        if (bet.customScheduleTime) return bet.customScheduleTime;
+        if (bet.matchTimestamp) return bet.matchTimestamp - (appSettings.scheduleOffsetMinutes * 60000);
+        return null;
+      };
+
+      const timeA = getEffectiveTime(a);
+      const timeB = getEffectiveTime(b);
+
+      if (timeA === null && timeB === null) return 0;
+      if (timeA === null) return -1;
+      if (timeB === null) return 1;
+
+      return timeA - timeB;
+    });
+  };
+
+  const queueBets = sortBetsByTime(bets.filter(b => !b.isPosted));
+  const historyBets = sortBetsByTime(bets.filter(b => b.isPosted));
 
   return (
     <div className="min-h-screen bg-[#36393f] font-sans text-gray-100 pb-20">
-      {/* Header */}
-      <header className="bg-[#202225] p-4 shadow-md sticky top-0 z-50 border-b border-gray-800">
+      <header className="bg-[#202225] p-3 md:p-4 shadow-md sticky top-0 z-50 border-b border-gray-800">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-2 md:space-x-3">
              <div className="w-8 h-8 bg-indigo-600 rounded-md flex items-center justify-center font-bold text-white shadow-lg shadow-indigo-500/50">
                 TC
              </div>
             <div>
-              <h1 className="text-xl font-bold text-white leading-tight">The Commissioner</h1>
+              <h1 className="text-lg md:text-xl font-bold text-white leading-tight">The Commissioner</h1>
             </div>
           </div>
           <div className="flex items-center space-x-2">
@@ -274,7 +292,6 @@ const App: React.FC = () => {
 
       <main className="max-w-4xl mx-auto p-4 md:p-6">
         
-        {/* Settings Modal */}
         {showSettings && (
           <div className="bg-[#2f3136] rounded-lg p-6 mb-8 border border-gray-700 shadow-xl animate-fade-in relative z-50">
              <button onClick={() => setShowSettings(false)} className="absolute top-4 right-4 text-gray-500 hover:text-white"><X size={20}/></button>
@@ -368,36 +385,34 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {/* Tab Navigation */}
-        <div className="flex space-x-2 mb-6 border-b border-gray-700 pb-1">
+        <div className="flex space-x-2 mb-4 md:mb-6 border-b border-gray-700 pb-1 overflow-x-auto">
           <button 
             onClick={() => setActiveTab('queue')}
-            className={`flex items-center px-4 py-2 font-medium transition-all rounded-t-lg ${activeTab === 'queue' ? 'bg-[#2f3136] text-white border-t border-l border-r border-gray-600' : 'text-gray-400 hover:text-white hover:bg-[#2f3136]/50'}`}
+            className={`flex items-center px-3 md:px-4 py-2 font-medium transition-all rounded-t-lg whitespace-nowrap text-sm md:text-base ${activeTab === 'queue' ? 'bg-[#2f3136] text-white border-t border-l border-r border-gray-600' : 'text-gray-400 hover:text-white hover:bg-[#2f3136]/50'}`}
           >
-            <Layers size={16} className="mr-2"/> Queue ({queueBets.length})
+            <Layers size={16} className="mr-1 md:mr-2"/> Queue ({queueBets.length})
           </button>
           <button 
             onClick={() => setActiveTab('history')}
-            className={`flex items-center px-4 py-2 font-medium transition-all rounded-t-lg ${activeTab === 'history' ? 'bg-[#2f3136] text-white border-t border-l border-r border-gray-600' : 'text-gray-400 hover:text-white hover:bg-[#2f3136]/50'}`}
+            className={`flex items-center px-3 md:px-4 py-2 font-medium transition-all rounded-t-lg whitespace-nowrap text-sm md:text-base ${activeTab === 'history' ? 'bg-[#2f3136] text-white border-t border-l border-r border-gray-600' : 'text-gray-400 hover:text-white hover:bg-[#2f3136]/50'}`}
           >
-            <FileText size={16} className="mr-2"/> History & Stats ({historyBets.length})
+            <FileText size={16} className="mr-1 md:mr-2"/> History & Stats ({historyBets.length})
           </button>
         </div>
 
-        {/* QUEUE TAB */}
         {activeTab === 'queue' && (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-              <div className="md:col-span-2 space-y-4">
-                <div className="flex items-center bg-[#2f3136] p-3 rounded-lg border border-gray-700 justify-between">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
+              <div className="md:col-span-2 space-y-3 md:space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center bg-[#2f3136] p-3 rounded-lg border border-gray-700 gap-2 sm:justify-between">
                    <div className="flex items-center">
-                       <Calendar size={20} className="text-gray-400 mr-2" />
-                       <label className="text-sm text-gray-400 mr-2">Slate Date:</label>
+                       <Calendar size={18} className="text-gray-400 mr-2" />
+                       <label className="text-xs sm:text-sm text-gray-400 mr-2">Slate Date:</label>
                        <input 
                          type="date" 
                          value={slateDate}
                          onChange={(e) => setSlateDate(e.target.value)}
-                         className="bg-[#202225] text-white border border-gray-600 rounded px-2 py-1 focus:outline-none focus:border-blue-500"
+                         className="bg-[#202225] text-white border border-gray-600 rounded px-2 py-1 text-sm focus:outline-none focus:border-blue-500 flex-1 sm:flex-none"
                        />
                    </div>
                 </div>
@@ -405,18 +420,18 @@ const App: React.FC = () => {
                 <Uploader onImageSelected={handleImageUpload} isLoading={loading} />
               </div>
               
-              <div className="flex flex-col space-y-3 justify-center">
-                 <button onClick={handleManualAdd} className="flex items-center justify-center p-4 bg-[#2f3136] hover:bg-[#40444b] rounded-lg border border-gray-700 transition-colors">
-                    <Plus size={20} className="mr-2 text-green-400"/> <span className="font-semibold">Add Manual Play</span>
+              <div className="flex flex-col space-y-2 md:space-y-3 justify-center">
+                 <button onClick={handleManualAdd} className="flex items-center justify-center p-3 md:p-4 bg-[#2f3136] hover:bg-[#40444b] rounded-lg border border-gray-700 transition-colors text-sm md:text-base">
+                    <Plus size={18} className="mr-2 text-green-400"/> <span className="font-semibold">Add Manual Play</span>
                  </button>
                  
-                 <button onClick={handleScheduleAll} className="flex items-center justify-center p-4 bg-[#2f3136] hover:bg-indigo-900/20 hover:border-indigo-500 rounded-lg border border-gray-700 transition-colors">
-                    <Clock size={20} className="mr-2 text-indigo-400"/> <span className="font-semibold text-indigo-100">Schedule All</span>
+                 <button onClick={handleScheduleAll} className="flex items-center justify-center p-3 md:p-4 bg-[#2f3136] hover:bg-indigo-900/20 hover:border-indigo-500 rounded-lg border border-gray-700 transition-colors text-sm md:text-base">
+                    <Clock size={18} className="mr-2 text-indigo-400"/> <span className="font-semibold text-indigo-100">Schedule All</span>
                  </button>
 
                  {queueBets.length > 0 && (
-                   <button onClick={clearAllBets} className="flex items-center justify-center p-4 bg-[#2f3136] hover:bg-red-900/20 hover:border-red-500 rounded-lg border border-gray-700 transition-colors">
-                      <Trash size={20} className="mr-2 text-red-400"/> <span className="font-semibold text-red-100">Clear All Queue</span>
+                   <button onClick={clearAllBets} className="flex items-center justify-center p-3 md:p-4 bg-[#2f3136] hover:bg-red-900/20 hover:border-red-500 rounded-lg border border-gray-700 transition-colors text-sm md:text-base">
+                      <Trash size={18} className="mr-2 text-red-400"/> <span className="font-semibold text-red-100">Clear All Queue</span>
                    </button>
                  )}
               </div>
@@ -443,10 +458,9 @@ const App: React.FC = () => {
           </>
         )}
 
-        {/* HISTORY TAB */}
         {activeTab === 'history' && (
           <>
-            <StatsOverview bets={bets} settings={appSettings} onUpdateSettings={setAppSettings} />
+            <StatsOverview bets={bets} settings={appSettings} onUpdateSettings={setAppSettings} onDeleteBet={handleDeleteBet} />
             
             <div className="flex justify-end mb-4">
                <button onClick={clearAllBets} className="flex items-center text-xs text-red-400 hover:text-red-200">

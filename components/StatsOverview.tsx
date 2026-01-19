@@ -8,9 +8,10 @@ interface StatsOverviewProps {
   bets: Bet[];
   settings: AppSettings;
   onUpdateSettings: (s: AppSettings) => void;
+  onDeleteBet: (id: string) => void;
 }
 
-const StatsOverview: React.FC<StatsOverviewProps> = ({ bets, settings, onUpdateSettings }) => {
+const StatsOverview: React.FC<StatsOverviewProps> = ({ bets, settings, onUpdateSettings, onDeleteBet }) => {
   const [recapTime, setRecapTime] = useState<string>('');
   const [recapScheduled, setRecapScheduled] = useState(false);
   const [useSeparateWebhook, setUseSeparateWebhook] = useState(false);
@@ -85,6 +86,16 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({ bets, settings, onUpdateS
       return;
     }
 
+    const pendingBets = bets.filter(b => b.result === BetResult.PENDING && b.isPosted);
+    const finishedPostedBets = bets.filter(b => b.result !== BetResult.PENDING && b.isPosted);
+    
+    if (pendingBets.length > 0) {
+      const confirmMessage = `There are ${pendingBets.length} pending play(s) that haven't been marked yet.\n\nDo you want to continue? Finished plays will be deleted, but pending plays will remain.`;
+      if (!window.confirm(confirmMessage)) {
+        return;
+      }
+    }
+
     const payload = {
         username: settings.botName,
         avatar_url: settings.botAvatarUrl,
@@ -106,7 +117,14 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({ bets, settings, onUpdateS
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(payload)
         });
-        alert("Recap sent successfully!");
+        
+        for (const bet of finishedPostedBets) {
+          onDeleteBet(bet.id);
+        }
+        
+        alert(pendingBets.length > 0 
+          ? `Recap sent successfully! Deleted ${finishedPostedBets.length} finished play(s). ${pendingBets.length} pending play(s) kept.`
+          : "Recap sent successfully! All plays cleared.");
     } catch(e) {
         console.error(e);
         alert("Failed to send recap.");
@@ -119,7 +137,6 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({ bets, settings, onUpdateS
         <span className="flex items-center"><span className="mr-2">📊</span> Recap & Performance</span>
       </h2>
 
-      {/* Recap Controls */}
       <div className="bg-[#202225] p-4 rounded mb-6 border border-gray-700">
          <h3 className="text-sm font-bold text-gray-300 mb-3 uppercase tracking-wide flex items-center">
             <Clock size={14} className="mr-2"/> Automated Recap
