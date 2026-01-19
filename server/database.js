@@ -5,7 +5,8 @@ import { dirname, join } from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const db = new Database(join(__dirname, 'betslate.db'));
+const dbPath = process.env.DATABASE_PATH || join(__dirname, 'betslate.db');
+const db = new Database(dbPath);
 
 export const initDatabase = () => {
   db.exec(`
