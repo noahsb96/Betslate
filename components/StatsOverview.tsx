@@ -106,7 +106,7 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({ bets, settings, onUpdateS
                 { name: "Net Units", value: `${netUnits > 0 ? '+' : ''}${formattedNetUnits}u`, inline: true },
                 { name: "Total ROI", value: `${finishedBets.length > 0 ? ((netUnits / finishedBets.reduce((a,b) => a+b.units,0)) * 100).toFixed(1) : 0}%`, inline: true }
             ],
-            footer: { text: "The Commissioner • Auto-Generated" }
+            footer: { text: `${settings.botName || 'AI BetSlate Automator'} • Auto-Generated` }
         }]
     };
 

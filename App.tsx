@@ -13,7 +13,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     mentionString: '@Chefs Plays',
     discordWebhookUrl: '',
     recapWebhookUrl: '',
-    botName: 'The Commissioner',
+    botName: 'AI BetSlate Automator',
     botAvatarUrl: '',
     scheduleOffsetMinutes: 15,
     slateTimezone: 'America/New_York',
@@ -290,7 +290,7 @@ const App: React.FC = () => {
     }
 
     const payload = {
-      username: appSettings.botName || "The Commissioner",
+      username: appSettings.botName || "AI BetSlate Automator",
       avatar_url: appSettings.botAvatarUrl || undefined,
       content: mentionContent,
       allowed_mentions: { 
@@ -372,6 +372,18 @@ const App: React.FC = () => {
             </h3>
             <div className="space-y-4">
                
+               <div>
+                 <label className="block text-sm text-gray-400 mb-1">Bot Display Name</label>
+                 <input 
+                   type="text" 
+                   value={appSettings.botName}
+                   onChange={(e) => setAppSettings({...appSettings, botName: e.target.value})}
+                   placeholder="AI BetSlate Automator"
+                   className="w-full bg-[#202225] border border-gray-700 rounded p-2 text-white focus:outline-none focus:border-blue-500"
+                 />
+                 <p className="text-xs text-gray-500 mt-1">Name shown in Discord messages and bet cards</p>
+               </div>
+
                <div>
                  <label className="block text-sm text-gray-400 mb-1">Role to Mention (Role ID)</label>
                  <input 

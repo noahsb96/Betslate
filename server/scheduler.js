@@ -15,7 +15,7 @@ const postToDiscord = async (bet, settings) => {
   }
 
   const payload = {
-    username: settings.botName || "The Commissioner",
+    username: settings.botName || "AI BetSlate Automator",
     avatar_url: settings.botAvatarUrl || undefined,
     content: mentionContent,
     allowed_mentions: {

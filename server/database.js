@@ -35,7 +35,7 @@ export const initDatabase = () => {
       mentionString TEXT DEFAULT '',
       discordWebhookUrl TEXT DEFAULT '',
       recapWebhookUrl TEXT DEFAULT '',
-      botName TEXT DEFAULT 'The Commissioner',
+      botName TEXT DEFAULT 'AI BetSlate Automator',
       botAvatarUrl TEXT DEFAULT '',
       scheduleOffsetMinutes INTEGER DEFAULT 15,
       slateTimezone TEXT DEFAULT 'America/New_York',
@@ -77,7 +77,7 @@ CRITICAL RULES:
   if (settingsExists.count === 0) {
     db.prepare(`
       INSERT INTO settings (id, mentionString, botName, scheduleOffsetMinutes, slateTimezone, defaultOdds, aiInstructions)
-      VALUES (1, '@Chefs Plays', 'The Commissioner', 15, 'America/New_York', '-120', ?)
+      VALUES (1, '@Chefs Plays', 'AI BetSlate Automator', 15, 'America/New_York', '-120', ?)
     `).run(defaultInstructions);
   } else {
     const currentSettings = db.prepare('SELECT aiInstructions FROM settings WHERE id = 1').get();

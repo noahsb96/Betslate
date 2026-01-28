@@ -79,6 +79,12 @@ const BetCard: React.FC<BetCardProps> = ({ bet, settings, onUpdate, onDelete, on
     ? new Date(effectiveTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' })
     : 'Not Scheduled';
 
+  const getInitials = (name: string) => {
+    const words = name.trim().split(/\s+/);
+    if (words.length === 1) return words[0].substring(0, 2).toUpperCase();
+    return words.slice(0, 2).map(w => w[0]).join('').toUpperCase();
+  };
+
   const formatForInput = (timestamp: number) => {
     const date = new Date(timestamp);
     const offset = date.getTimezoneOffset() * 60000;
@@ -92,14 +98,14 @@ const BetCard: React.FC<BetCardProps> = ({ bet, settings, onUpdate, onDelete, on
         {settings.botAvatarUrl ? (
           <img src={settings.botAvatarUrl} alt="Bot" className="w-10 h-10 rounded-full object-cover" />
         ) : (
-          <div className="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold">
-            TC
+          <div className="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold text-xs">
+            {getInitials(settings.botName || 'AI BetSlate Automator')}
           </div>
         )}
         
         <div className="flex flex-col">
           <div className="flex items-center space-x-2">
-            <span className="font-semibold text-white">{settings.botName || 'The Commissioner'}</span>
+            <span className="font-semibold text-white">{settings.botName || 'AI BetSlate Automator'}</span>
             <span className="bg-[#5865f2] text-[10px] text-white px-1 rounded">APP</span>
             <span className="text-gray-400 text-xs">
               {bet.isPosted ? 'Posted' : `Starts at ${bet.time}`}

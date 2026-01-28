@@ -31,7 +31,7 @@ router.put('/', (req, res) => {
       settings.mentionString || '',
       settings.discordWebhookUrl || '',
       settings.recapWebhookUrl || '',
-      settings.botName || 'The Commissioner',
+      settings.botName || 'AI BetSlate Automator',
       settings.botAvatarUrl || '',
       settings.scheduleOffsetMinutes || 15,
       settings.slateTimezone || 'America/New_York',
