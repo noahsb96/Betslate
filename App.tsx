@@ -311,10 +311,10 @@ const App: React.FC = () => {
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="flex items-center space-x-3">
              <div className="w-8 h-8 bg-indigo-600 rounded-md flex items-center justify-center font-bold text-white shadow-lg shadow-indigo-500/50">
-                TC
+                BS
              </div>
             <div>
-              <h1 className="text-xl font-bold text-white leading-tight">The Commissioner</h1>
+              <h1 className="text-xl font-bold text-white leading-tight">BetSlate AI Automator</h1>
             </div>
           </div>
           <div className="flex items-center space-x-2">
