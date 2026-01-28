@@ -67,15 +67,26 @@ export const startScheduler = () => {
           ? bet.customScheduleTime 
           : (bet.matchTimestamp ? bet.matchTimestamp - (settings.scheduleOffsetMinutes * 60 * 1000) : null);
         
-        if (postTime && now >= postTime) {
-          console.log(`🔔 Auto-posting bet: ${bet.playerA} vs ${bet.playerB}`);
-          const success = await postToDiscord(bet, settings);
+        if (postTime) {
+          const timeDiff = now - postTime;
+          const fiveMinutesInMs = 5 * 60 * 1000;
           
-          if (success) {
-            db.prepare('UPDATE bets SET isPosted = 1, autoPost = 0 WHERE id = ?').run(bet.id);
-            console.log(`✅ Successfully posted: ${bet.playerA} vs ${bet.playerB}`);
-          } else {
-            console.log(`❌ Failed to post: ${bet.playerA} vs ${bet.playerB}`);
+          if (timeDiff > fiveMinutesInMs) {
+            console.log(`⚠️ Skipping bet scheduled in the past: ${bet.playerA} vs ${bet.playerB} (scheduled ${Math.round(timeDiff / 60000)} mins ago)`);
+            db.prepare('UPDATE bets SET autoPost = 0 WHERE id = ?').run(bet.id);
+            continue;
+          }
+
+          if (now >= postTime) {
+            console.log(`🔔 Auto-posting bet: ${bet.playerA} vs ${bet.playerB}`);
+            const success = await postToDiscord(bet, settings);
+            
+            if (success) {
+              db.prepare('UPDATE bets SET isPosted = 1, autoPost = 0 WHERE id = ?').run(bet.id);
+              console.log(`✅ Successfully posted: ${bet.playerA} vs ${bet.playerB}`);
+            } else {
+              console.log(`❌ Failed to post: ${bet.playerA} vs ${bet.playerB}`);
+            }
           }
         }
       }
