@@ -280,7 +280,8 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({ bets, settings, onUpdateS
                  <div 
                    className="bg-[#2f3136] rounded p-3 border-l-4" 
                    style={{borderColor: `#${settings.recapEmbedColor.toString(16).padStart(6, '0')}`}}
-                 >\n                   <div className="font-bold text-white mb-2">{buildRecapEmbed().title}</div>
+                 >
+                   <div className="font-bold text-white mb-2">{buildRecapEmbed().title}</div>
                    <div className="space-y-1">
                      {buildRecapEmbed().fields.map((field, idx) => (
                        <div key={idx} className={field.inline ? 'inline-block mr-4' : 'block'}>
