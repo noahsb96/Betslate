@@ -14,7 +14,6 @@ interface StatsOverviewProps {
 const StatsOverview: React.FC<StatsOverviewProps> = ({ bets, settings, onUpdateSettings, onDeleteBet }) => {
   const [recapTime, setRecapTime] = useState<string>('');
   const [recapScheduled, setRecapScheduled] = useState(false);
-  const [useSeparateWebhook, setUseSeparateWebhook] = useState(false);
 
   const finishedBets = bets.filter(b => b.result !== BetResult.PENDING);
   
@@ -79,7 +78,7 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({ bets, settings, onUpdateS
   }, [recapScheduled, recapTime, finishedBets]);
 
   const handleSendRecap = async () => {
-    const url = (useSeparateWebhook && settings.recapWebhookUrl) ? settings.recapWebhookUrl : settings.discordWebhookUrl;
+    const url = (settings.recapWebhookUrl && settings.recapWebhookUrl.trim()) ? settings.recapWebhookUrl : settings.discordWebhookUrl;
     
     if (!url) {
       alert("No Webhook URL configured for recap.");
@@ -156,17 +155,6 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({ bets, settings, onUpdateS
                     {recapScheduled ? 'Scheduled' : 'Schedule'}
                  </button>
              </div>
-             
-             <div className="flex items-center space-x-2">
-                 <input 
-                    type="checkbox" 
-                    id="webhookToggle"
-                    checked={useSeparateWebhook}
-                    onChange={(e) => setUseSeparateWebhook(e.target.checked)}
-                    className="rounded bg-gray-700 border-gray-600"
-                 />
-                 <label htmlFor="webhookToggle" className="text-xs text-gray-400">Use separate Recap Webhook</label>
-             </div>
 
              <div className="ml-auto">
                  <button onClick={handleSendRecap} className="flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-sm transition-colors">
@@ -174,17 +162,6 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({ bets, settings, onUpdateS
                  </button>
              </div>
          </div>
-         {useSeparateWebhook && (
-             <div className="mt-3">
-                 <input 
-                    type="text" 
-                    placeholder="Paste Recap Webhook URL here..."
-                    value={settings.recapWebhookUrl || ''}
-                    onChange={(e) => onUpdateSettings({...settings, recapWebhookUrl: e.target.value})}
-                    className="w-full bg-[#2f3136] border border-gray-600 rounded px-3 py-1 text-xs text-gray-300 focus:outline-none"
-                 />
-             </div>
-         )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">

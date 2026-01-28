@@ -456,7 +456,7 @@ const App: React.FC = () => {
 
         {activeTab === 'history' && (
           <>
-            <StatsOverview bets={bets} settings={appSettings} onUpdateSettings={setAppSettings} />
+            <StatsOverview bets={bets} settings={appSettings} onUpdateSettings={setAppSettings} onDeleteBet={handleDeleteBet} />
             
             <div className="flex justify-end mb-4">
                <button onClick={clearAllBets} className="flex items-center text-xs text-red-400 hover:text-red-200">
