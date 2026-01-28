@@ -25,7 +25,8 @@ export const initDatabase = () => {
       matchTimestamp INTEGER,
       customScheduleTime INTEGER,
       autoPost INTEGER DEFAULT 0,
-      isPosted INTEGER DEFAULT 0
+      isPosted INTEGER DEFAULT 0,
+      customTitle TEXT
     )
   `);
 
@@ -46,9 +47,17 @@ export const initDatabase = () => {
       recapIncludeRecord INTEGER DEFAULT 1,
       recapIncludeNetUnits INTEGER DEFAULT 1,
       recapIncludeROI INTEGER DEFAULT 1,
-      recapIncludeLeagueStats INTEGER DEFAULT 0
+      recapIncludeLeagueStats INTEGER DEFAULT 0,
+      defaultBetAlertTitle TEXT DEFAULT '📢 Bet Alert',
+      betEmbedColor INTEGER DEFAULT 16731469,
+      recapEmbedColor INTEGER DEFAULT 16731469
     )
   `);
+
+  try {
+    db.exec(`ALTER TABLE bets ADD COLUMN customTitle TEXT`);
+  } catch (err) {
+  }
 
   try {
     db.exec(`ALTER TABLE settings ADD COLUMN aiInstructions TEXT DEFAULT ''`);
@@ -62,6 +71,13 @@ export const initDatabase = () => {
     db.exec(`ALTER TABLE settings ADD COLUMN recapIncludeNetUnits INTEGER DEFAULT 1`);
     db.exec(`ALTER TABLE settings ADD COLUMN recapIncludeROI INTEGER DEFAULT 1`);
     db.exec(`ALTER TABLE settings ADD COLUMN recapIncludeLeagueStats INTEGER DEFAULT 0`);
+  } catch (err) {
+  }
+
+  try {
+    db.exec(`ALTER TABLE settings ADD COLUMN defaultBetAlertTitle TEXT DEFAULT '📢 Bet Alert'`);
+    db.exec(`ALTER TABLE settings ADD COLUMN betEmbedColor INTEGER DEFAULT 16731469`);
+    db.exec(`ALTER TABLE settings ADD COLUMN recapEmbedColor INTEGER DEFAULT 16731469`);
   } catch (err) {
   }
 
@@ -92,8 +108,8 @@ CRITICAL RULES:
   const settingsExists = db.prepare('SELECT COUNT(*) as count FROM settings WHERE id = 1').get();
   if (settingsExists.count === 0) {
     db.prepare(`
-      INSERT INTO settings (id, mentionString, botName, scheduleOffsetMinutes, slateTimezone, defaultOdds, aiInstructions, recapTitle, recapIncludeDate, recapIncludeRecord, recapIncludeNetUnits, recapIncludeROI, recapIncludeLeagueStats)
-      VALUES (1, '@Chefs Plays', 'AI BetSlate Automator', 15, 'America/New_York', '-120', ?, 'Daily Recap', 1, 1, 1, 1, 0)
+      INSERT INTO settings (id, mentionString, botName, scheduleOffsetMinutes, slateTimezone, defaultOdds, aiInstructions, recapTitle, recapIncludeDate, recapIncludeRecord, recapIncludeNetUnits, recapIncludeROI, recapIncludeLeagueStats, defaultBetAlertTitle, betEmbedColor, recapEmbedColor)
+      VALUES (1, '@Chefs Plays', 'AI BetSlate Automator', 15, 'America/New_York', '-120', ?, 'Daily Recap', 1, 1, 1, 1, 0, '📢 Bet Alert', 16731469, 16731469)
     `).run(defaultInstructions);
   } else {
     // Try to select from new columns, if they don't exist, migration will add them

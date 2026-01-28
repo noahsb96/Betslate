@@ -23,6 +23,7 @@ export interface Bet {
   customScheduleTime?: number;
   autoPost: boolean;
   isPosted: boolean;
+  customTitle?: string;
 }
 
 export interface AppSettings {
@@ -41,6 +42,9 @@ export interface AppSettings {
   recapIncludeNetUnits: boolean;
   recapIncludeROI: boolean;
   recapIncludeLeagueStats: boolean;
+  defaultBetAlertTitle: string;
+  betEmbedColor: number;
+  recapEmbedColor: number;
 }
 
 export interface UserAccount {

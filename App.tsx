@@ -24,6 +24,9 @@ const DEFAULT_SETTINGS: AppSettings = {
     recapIncludeNetUnits: true,
     recapIncludeROI: true,
     recapIncludeLeagueStats: false,
+    defaultBetAlertTitle: '📢 Bet Alert',
+    betEmbedColor: 16731469,
+    recapEmbedColor: 16731469,
     aiInstructions: `You are an expert sports betting assistant specialized in Table Tennis.
 Your task is to analyze an image of a betting slate and extract the structured betting data.
 
@@ -305,8 +308,8 @@ const App: React.FC = () => {
       }, 
       embeds: [
         {
-          title: "📢 Bet Alert",
-          color: 16731469, 
+          title: bet.customTitle || appSettings.defaultBetAlertTitle,
+          color: appSettings.betEmbedColor, 
           fields: [
             { name: "Match", value: `${bet.playerA} vs ${bet.playerB}`, inline: false },
             { name: "Type", value: bet.type, inline: true },
@@ -469,6 +472,60 @@ const App: React.FC = () => {
                    className="w-full bg-[#202225] border border-gray-700 rounded p-2 text-white text-xs font-mono focus:outline-none focus:border-blue-500 resize-y"
                  />
                  <p className="text-xs text-gray-500 mt-1">Customize how the AI analyzes betting slates</p>
+               </div>
+
+               <div className="border-t border-gray-700 pt-4 mt-2">
+                 <h3 className="text-sm font-semibold text-gray-300 mb-3">Discord Message Customization</h3>
+                 
+                 <div className="space-y-4">
+                   <div>
+                     <label className="block text-sm text-gray-400 mb-1">Default Bet Alert Title</label>
+                     <input 
+                       type="text" 
+                       value={appSettings.defaultBetAlertTitle}
+                       onChange={(e) => setAppSettings({...appSettings, defaultBetAlertTitle: e.target.value})}
+                       placeholder="📢 Bet Alert"
+                       className="w-full bg-[#202225] border border-gray-700 rounded p-2 text-white focus:outline-none focus:border-blue-500"
+                     />
+                     <p className="text-xs text-gray-500 mt-1">Title shown in Discord for bet alerts (can be overridden per bet)</p>
+                   </div>
+
+                   <div className="grid grid-cols-2 gap-4">
+                     <div>
+                       <label className="block text-sm text-gray-400 mb-1">Bet Alert Color</label>
+                       <div className="flex space-x-2">
+                         <input 
+                           type="number" 
+                           value={appSettings.betEmbedColor}
+                           onChange={(e) => setAppSettings({...appSettings, betEmbedColor: e.target.value === '' ? 0 : parseInt(e.target.value)})}
+                           className="flex-1 bg-[#202225] border border-gray-700 rounded p-2 text-white focus:outline-none focus:border-blue-500"
+                         />
+                         <div 
+                           className="w-12 h-10 rounded border border-gray-600"
+                           style={{ backgroundColor: `#${appSettings.betEmbedColor.toString(16).padStart(6, '0')}` }}
+                         />
+                       </div>
+                       <p className="text-xs text-gray-500 mt-1">Decimal color code</p>
+                     </div>
+
+                     <div>
+                       <label className="block text-sm text-gray-400 mb-1">Recap Color</label>
+                       <div className="flex space-x-2">
+                         <input 
+                           type="number" 
+                           value={appSettings.recapEmbedColor}
+                           onChange={(e) => setAppSettings({...appSettings, recapEmbedColor: e.target.value === '' ? 0 : parseInt(e.target.value)})}
+                           className="flex-1 bg-[#202225] border border-gray-700 rounded p-2 text-white focus:outline-none focus:border-blue-500"
+                         />
+                         <div 
+                           className="w-12 h-10 rounded border border-gray-600"
+                           style={{ backgroundColor: `#${appSettings.recapEmbedColor.toString(16).padStart(6, '0')}` }}
+                         />
+                       </div>
+                       <p className="text-xs text-gray-500 mt-1">Decimal color code</p>
+                     </div>
+                   </div>
+                 </div>
                </div>
 
               <div className="flex justify-end pt-2">

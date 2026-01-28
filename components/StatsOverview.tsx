@@ -104,7 +104,7 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({ bets, settings, onUpdateS
     
     return {
       title: `${settings.recapTitle || 'Daily Recap'}${titleDate}`,
-      color: netUnits >= 0 ? 5763719 : 15548997,
+      color: settings.recapEmbedColor,
       fields: fields,
       footer: { text: `${settings.botName || 'AI BetSlate Automator'} • Auto-Generated` }
     };
@@ -277,8 +277,10 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({ bets, settings, onUpdateS
              {showRecapPreview && (
                <div className="bg-[#36393f] p-4 rounded border border-gray-600">
                  <div className="text-xs text-gray-400 mb-2">Discord Embed Preview:</div>
-                 <div className="bg-[#2f3136] rounded p-3 border-l-4" style={{borderColor: netUnits >= 0 ? '#57F287' : '#ED4245'}}>
-                   <div className="font-bold text-white mb-2">{buildRecapEmbed().title}</div>
+                 <div 
+                   className="bg-[#2f3136] rounded p-3 border-l-4" 
+                   style={{borderColor: `#${settings.recapEmbedColor.toString(16).padStart(6, '0')}`}}
+                 >\n                   <div className="font-bold text-white mb-2">{buildRecapEmbed().title}</div>
                    <div className="space-y-1">
                      {buildRecapEmbed().fields.map((field, idx) => (
                        <div key={idx} className={field.inline ? 'inline-block mr-4' : 'block'}>

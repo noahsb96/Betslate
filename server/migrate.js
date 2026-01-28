@@ -12,20 +12,23 @@ console.log('🔄 Running database migration...');
 console.log(`📂 Database path: ${dbPath}`);
 
 try {
-  // Check if columns exist
+  // Check if columns exist in settings table
   const columns = db.prepare('PRAGMA table_info(settings)').all();
   const columnNames = columns.map(col => col.name);
   
-  console.log('Current columns:', columnNames);
+  console.log('Current settings columns:', columnNames);
   
-  // Add missing columns
+  // Add missing columns to settings table
   const columnsToAdd = [
     { name: 'recapTitle', sql: 'ALTER TABLE settings ADD COLUMN recapTitle TEXT DEFAULT "Daily Recap"' },
     { name: 'recapIncludeDate', sql: 'ALTER TABLE settings ADD COLUMN recapIncludeDate INTEGER DEFAULT 1' },
     { name: 'recapIncludeRecord', sql: 'ALTER TABLE settings ADD COLUMN recapIncludeRecord INTEGER DEFAULT 1' },
     { name: 'recapIncludeNetUnits', sql: 'ALTER TABLE settings ADD COLUMN recapIncludeNetUnits INTEGER DEFAULT 1' },
     { name: 'recapIncludeROI', sql: 'ALTER TABLE settings ADD COLUMN recapIncludeROI INTEGER DEFAULT 1' },
-    { name: 'recapIncludeLeagueStats', sql: 'ALTER TABLE settings ADD COLUMN recapIncludeLeagueStats INTEGER DEFAULT 0' }
+    { name: 'recapIncludeLeagueStats', sql: 'ALTER TABLE settings ADD COLUMN recapIncludeLeagueStats INTEGER DEFAULT 0' },
+    { name: 'defaultBetAlertTitle', sql: 'ALTER TABLE settings ADD COLUMN defaultBetAlertTitle TEXT DEFAULT "📢 Bet Alert"' },
+    { name: 'betEmbedColor', sql: 'ALTER TABLE settings ADD COLUMN betEmbedColor INTEGER DEFAULT 16731469' },
+    { name: 'recapEmbedColor', sql: 'ALTER TABLE settings ADD COLUMN recapEmbedColor INTEGER DEFAULT 16731469' }
   ];
   
   for (const col of columnsToAdd) {
@@ -35,6 +38,19 @@ try {
     } else {
       console.log(`✓ Column already exists: ${col.name}`);
     }
+  }
+  
+  // Check and add custom title column to bets table
+  const betsColumns = db.prepare('PRAGMA table_info(bets)').all();
+  const betsColumnNames = betsColumns.map(col => col.name);
+  
+  console.log('Current bets columns:', betsColumnNames);
+  
+  if (!betsColumnNames.includes('customTitle')) {
+    console.log('➕ Adding column to bets: customTitle');
+    db.exec('ALTER TABLE bets ADD COLUMN customTitle TEXT');
+  } else {
+    console.log('✓ Column already exists in bets: customTitle');
   }
   
   // Set defaults for existing row if needed

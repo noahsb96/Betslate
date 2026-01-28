@@ -24,8 +24,8 @@ const postToDiscord = async (bet, settings) => {
     },
     embeds: [
       {
-        title: "📢 Bet Alert",
-        color: 16731469,
+        title: bet.customTitle || settings.defaultBetAlertTitle || "📢 Bet Alert",
+        color: settings.betEmbedColor || 16731469,
         fields: [
           { name: "Match", value: `${bet.playerA} vs ${bet.playerB}`, inline: false },
           { name: "Type", value: bet.type, inline: true },

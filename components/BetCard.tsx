@@ -27,7 +27,8 @@ const BetCard: React.FC<BetCardProps> = ({ bet, settings, onUpdate, onDelete, on
       units: editForm.units,
       odds: editForm.odds,
       league: editForm.league,
-      time: editForm.time
+      time: editForm.time,
+      customTitle: editForm.customTitle
     });
     setIsEditing(false);
   };
@@ -212,13 +213,25 @@ const BetCard: React.FC<BetCardProps> = ({ bet, settings, onUpdate, onDelete, on
       </div>
 
       <div className="p-4 bg-[#2f3136] rounded-br-md text-gray-100 pl-16 pt-0">
-        <div className="bg-[#202225] border-l-4 border-[#ff4d4d] rounded p-4 mt-2 max-w-md shadow-sm">
+        <div 
+          className="bg-[#202225] border-l-4 rounded p-4 mt-2 max-w-md shadow-sm"
+          style={{ borderLeftColor: `#${settings.betEmbedColor.toString(16).padStart(6, '0')}` }}
+        >
           <div className="flex items-center text-white font-bold mb-2">
-             📢 Bet Alert
+             {bet.customTitle || settings.defaultBetAlertTitle}
           </div>
           
           {isEditing ? (
             <div className="space-y-3 text-sm">
+               <div>
+                  <label className="block text-xs text-gray-400">Custom Title (Optional)</label>
+                  <input 
+                    className="bg-gray-700 text-white px-2 py-1 rounded w-full" 
+                    value={editForm.customTitle || ''} 
+                    onChange={e => setEditForm({...editForm, customTitle: e.target.value})} 
+                    placeholder={settings.defaultBetAlertTitle}
+                  />
+               </div>
                <div>
                   <label className="block text-xs text-gray-400">Players</label>
                   <div className="flex space-x-2">

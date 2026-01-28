@@ -14,7 +14,10 @@ router.get('/', (req, res) => {
       recapIncludeRecord: settings.recapIncludeRecord !== null ? Boolean(settings.recapIncludeRecord) : true,
       recapIncludeNetUnits: settings.recapIncludeNetUnits !== null ? Boolean(settings.recapIncludeNetUnits) : true,
       recapIncludeROI: settings.recapIncludeROI !== null ? Boolean(settings.recapIncludeROI) : true,
-      recapIncludeLeagueStats: settings.recapIncludeLeagueStats !== null ? Boolean(settings.recapIncludeLeagueStats) : false
+      recapIncludeLeagueStats: settings.recapIncludeLeagueStats !== null ? Boolean(settings.recapIncludeLeagueStats) : false,
+      defaultBetAlertTitle: settings.defaultBetAlertTitle || '📢 Bet Alert',
+      betEmbedColor: settings.betEmbedColor || 16731469,
+      recapEmbedColor: settings.recapEmbedColor || 16731469
     };
     
     res.json(formattedSettings);
@@ -43,7 +46,10 @@ router.put('/', (req, res) => {
         recapIncludeRecord = ?,
         recapIncludeNetUnits = ?,
         recapIncludeROI = ?,
-        recapIncludeLeagueStats = ?
+        recapIncludeLeagueStats = ?,
+        defaultBetAlertTitle = ?,
+        betEmbedColor = ?,
+        recapEmbedColor = ?
       WHERE id = 1
     `).run(
       settings.mentionString || '',
@@ -60,7 +66,10 @@ router.put('/', (req, res) => {
       settings.recapIncludeRecord ? 1 : 0,
       settings.recapIncludeNetUnits ? 1 : 0,
       settings.recapIncludeROI ? 1 : 0,
-      settings.recapIncludeLeagueStats ? 1 : 0
+      settings.recapIncludeLeagueStats ? 1 : 0,
+      settings.defaultBetAlertTitle || '📢 Bet Alert',
+      settings.betEmbedColor || 16731469,
+      settings.recapEmbedColor || 16731469
     );
     
     const updated = db.prepare('SELECT * FROM settings WHERE id = 1').get();
@@ -72,7 +81,10 @@ router.put('/', (req, res) => {
       recapIncludeRecord: updated.recapIncludeRecord !== null ? Boolean(updated.recapIncludeRecord) : true,
       recapIncludeNetUnits: updated.recapIncludeNetUnits !== null ? Boolean(updated.recapIncludeNetUnits) : true,
       recapIncludeROI: updated.recapIncludeROI !== null ? Boolean(updated.recapIncludeROI) : true,
-      recapIncludeLeagueStats: updated.recapIncludeLeagueStats !== null ? Boolean(updated.recapIncludeLeagueStats) : false
+      recapIncludeLeagueStats: updated.recapIncludeLeagueStats !== null ? Boolean(updated.recapIncludeLeagueStats) : false,
+      defaultBetAlertTitle: updated.defaultBetAlertTitle || '📢 Bet Alert',
+      betEmbedColor: updated.betEmbedColor || 16731469,
+      recapEmbedColor: updated.recapEmbedColor || 16731469
     };
     
     res.json(formattedUpdated);
