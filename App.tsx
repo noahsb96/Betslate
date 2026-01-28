@@ -237,6 +237,26 @@ const App: React.FC = () => {
      setBets(prev => [newBet, ...prev]);
   };
 
+  const handleManualAddPosted = async () => {
+     const newBet: Bet = {
+         id: uuidv4(),
+         league: 'Manual Entry',
+         playerA: 'Player A',
+         playerB: 'Player B',
+         time: '12:00 PM',
+         type: 'OVER',
+         units: 1,
+         result: BetResult.PENDING,
+         timestamp: Date.now(),
+         autoPost: false,
+         isPosted: true,
+         matchTimestamp: parseMatchTime('12:00 PM', slateDate, appSettings.slateTimezone)
+     };
+     await betsAPI.create(newBet);
+     setBets(prev => [newBet, ...prev]);
+     setScrollToBetId(newBet.id);
+  };
+
   const handleScheduleAll = async () => {
     const confirm = window.confirm(`Schedule all queued bets to auto-post ${appSettings.scheduleOffsetMinutes} mins before start?`);
     if (confirm) {
@@ -527,7 +547,10 @@ const App: React.FC = () => {
           <>
             <StatsOverview bets={bets} settings={appSettings} onUpdateSettings={setAppSettings} onDeleteBet={handleDeleteBet} />
             
-            <div className="flex justify-end mb-4">
+            <div className="flex justify-between items-center mb-4">
+               <button onClick={handleManualAddPosted} className="flex items-center text-sm px-3 py-2 bg-[#2f3136] hover:bg-[#40444b] rounded-lg border border-gray-700 transition-colors">
+                  <Plus size={16} className="mr-1 text-green-400"/> Add Manual Play
+               </button>
                <button onClick={clearAllBets} className="flex items-center text-xs text-red-400 hover:text-red-200">
                   <RefreshCw size={12} className="mr-1"/> Reset All Data
                </button>
