@@ -19,7 +19,15 @@ const BetCard: React.FC<BetCardProps> = ({ bet, settings, onUpdate, onDelete, on
   const [tempScheduleTime, setTempScheduleTime] = useState<string>('');
 
   const handleSave = () => {
-    onUpdate(bet.id, editForm);
+    onUpdate(bet.id, {
+      playerA: editForm.playerA,
+      playerB: editForm.playerB,
+      type: editForm.type,
+      units: editForm.units,
+      odds: editForm.odds,
+      league: editForm.league,
+      time: editForm.time
+    });
     setIsEditing(false);
   };
 
@@ -167,7 +175,10 @@ const BetCard: React.FC<BetCardProps> = ({ bet, settings, onUpdate, onDelete, on
           {isEditing ? (
              <button onClick={handleSave} className="p-1.5 text-green-400 hover:bg-gray-700 rounded"><Save size={16}/></button>
           ) : (
-             <button onClick={() => setIsEditing(true)} className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700 rounded"><Edit2 size={16}/></button>
+             <button onClick={() => {
+               setEditForm(bet);
+               setIsEditing(true);
+             }} className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700 rounded"><Edit2 size={16}/></button>
           )}
           
           <button 
