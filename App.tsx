@@ -62,6 +62,21 @@ const App: React.FC = () => {
     saveSettings();
   }, [appSettings]);
 
+  useEffect(() => {
+    const pollBets = async () => {
+      try {
+        const betsData = await betsAPI.getAll();
+        setBets(betsData);
+      } catch (err) {
+        console.error('Failed to refresh bets:', err);
+      }
+    };
+
+    const intervalId = setInterval(pollBets, 10000);
+
+    return () => clearInterval(intervalId);
+  }, []);
+
   const parseMatchTime = (timeString: string, dateStr: string, timezone: string): number | undefined => {
     try {
       let cleanTime = timeString.toLowerCase().replace(/\./g, '').trim(); 
