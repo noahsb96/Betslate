@@ -203,9 +203,8 @@ const App: React.FC = () => {
       ...bet,
       id: uuidv4(),
       timestamp: Date.now(),
-      isPosted: false,
       autoPost: false,
-      result: BetResult.PENDING
+      result: bet.isPosted ? bet.result : BetResult.PENDING
     };
     await betsAPI.create(copiedBet);
     setBets(prev => [copiedBet, ...prev]);
