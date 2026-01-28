@@ -27,12 +27,12 @@ CRITICAL RULES:
    - If "Czech: Czech Liga Pro" -> "Czech Liga Pro".
    - **ALLOWED LEAGUES**: Only use one of these 4 leagues: "Czech Liga Pro", "TT Elite Series", "TT Cup", "Setka Cup".
    - **DEFAULT**: If the league cannot be determined or doesn't match one of the 4 allowed leagues, use "TT Elite Series".
-
-Extract this into a JSON list.
 `;
 
-export const analyzeSlateImage = async (base64Image: string, apiKey: string): Promise<Bet[]> => {
+export const analyzeSlateImage = async (base64Image: string, apiKey: string, systemInstructions?: string): Promise<Bet[]> => {
   if (!apiKey) throw new Error("API Key is missing");
+  
+  const instructions = systemInstructions || SLATE_SYSTEM_INSTRUCTION;
 
   const ai = new GoogleGenAI({ apiKey });
   const cleanBase64 = base64Image.replace(/^data:image\/(png|jpeg|jpg|webp);base64,/, "");
@@ -49,7 +49,7 @@ export const analyzeSlateImage = async (base64Image: string, apiKey: string): Pr
         }
       ],
       config: {
-        systemInstruction: SLATE_SYSTEM_INSTRUCTION,
+        systemInstruction: instructions,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.ARRAY,

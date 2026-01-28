@@ -17,7 +17,30 @@ const DEFAULT_SETTINGS: AppSettings = {
     botAvatarUrl: '',
     scheduleOffsetMinutes: 15,
     slateTimezone: 'America/New_York',
-    defaultOdds: '-120'
+    defaultOdds: '-120',
+    aiInstructions: `You are an expert sports betting assistant specialized in Table Tennis.
+Your task is to analyze an image of a betting slate and extract the structured betting data.
+
+The image typically contains rows with:
+1. Time (e.g., 1:45 p.m.)
+2. Player Names (Two players)
+3. Bet Type (Usually "UNDER", "OVER", or "SPLIT"). 
+4. Indicators of confidence/units (Hammers, Stars, Nuclear symbols).
+
+CRITICAL RULES:
+1. **Units**: 
+   - Hammer icon = **1.5** units.
+   - Nuclear/Radioactive icon = **3** units.
+   - Star or no icon = **1** unit.
+2. **Bet Type**: 
+   - If the text explicitly says "UNDER", "OVER", or "SPLIT", use that.
+   - **IMPORTANT**: If NO bet type text is found next to the players, assume the bet is **"OVER"**.
+3. **League**:
+   - Extract the league header.
+   - **CLEANING**: If the league starts with "International: ", remove "International: ". (e.g., "International: TT Elite Series" -> "TT Elite Series").
+   - If "Czech: Czech Liga Pro" -> "Czech Liga Pro".
+   - **ALLOWED LEAGUES**: Only use one of these 4 leagues: "Czech Liga Pro", "TT Elite Series", "TT Cup", "Setka Cup".
+   - **DEFAULT**: If the league cannot be determined or doesn't match one of the 4 allowed leagues, use "TT Elite Series".`
 };
 
 const App: React.FC = () => {
@@ -142,7 +165,7 @@ const App: React.FC = () => {
     setError(null);
     
     try {
-        const newBetsRaw = await analyzeSlateImage(base64, apiKey);
+        const newBetsRaw = await analyzeSlateImage(base64, apiKey, appSettings.aiInstructions);
         const processedBets = newBetsRaw.map(b => ({
             ...b,
             matchTimestamp: parseMatchTime(b.time, slateDate, appSettings.slateTimezone),
@@ -383,6 +406,18 @@ const App: React.FC = () => {
                    placeholder="Leave empty to use main webhook"
                    className="w-full bg-[#202225] border border-gray-700 rounded p-2 text-white focus:outline-none focus:border-blue-500"
                  />
+               </div>
+
+               <div>
+                 <label className="block text-sm text-gray-400 mb-1">AI Analysis Instructions</label>
+                 <textarea 
+                   value={appSettings.aiInstructions}
+                   onChange={(e) => setAppSettings({...appSettings, aiInstructions: e.target.value})}
+                   rows={12}
+                   placeholder="Enter custom instructions for AI image analysis..."
+                   className="w-full bg-[#202225] border border-gray-700 rounded p-2 text-white text-xs font-mono focus:outline-none focus:border-blue-500 resize-y"
+                 />
+                 <p className="text-xs text-gray-500 mt-1">Customize how the AI analyzes betting slates</p>
                </div>
 
               <div className="flex justify-end pt-2">

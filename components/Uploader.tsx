@@ -49,8 +49,7 @@ const Uploader: React.FC<UploaderProps> = ({ onImageSelected, isLoading }) => {
         {isLoading ? (
           <div className="text-center animate-pulse">
             <Loader2 className="w-12 h-12 text-blue-500 mx-auto mb-4 animate-spin" />
-            <h3 className="text-lg font-bold text-white">AI is Analyzing Slate...</h3>
-            <p className="text-gray-400 text-sm mt-2">Extracting matches, times, and hammers.</p>
+            <h3 className="text-lg font-bold text-white">Analyzing Image</h3>
           </div>
         ) : preview ? (
            <div className="relative w-full h-full flex flex-col items-center justify-center">

@@ -34,6 +34,7 @@ export interface AppSettings {
   scheduleOffsetMinutes: number; 
   slateTimezone: string;
   defaultOdds: string;
+  aiInstructions: string;
 }
 
 export interface UserAccount {
