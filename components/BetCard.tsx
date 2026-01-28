@@ -1,17 +1,18 @@
 
 import React, { useState } from 'react';
 import { Bet, BetResult, AppSettings } from '../types';
-import { Check, X, Clock, Edit2, Trash2, Save, Send, Loader2, CalendarClock, Settings2, ExternalLink } from 'lucide-react';
+import { Check, X, Clock, Edit2, Trash2, Save, Send, Loader2, CalendarClock, Settings2, ExternalLink, Copy } from 'lucide-react';
 
 interface BetCardProps {
   bet: Bet;
   settings: AppSettings;
   onUpdate: (id: string, updates: Partial<Bet>, shouldScroll?: boolean) => void;
   onDelete: (id: string) => void;
+  onCopy: (bet: Bet) => void;
   onPostToDiscord: (bet: Bet) => Promise<boolean>;
 }
 
-const BetCard: React.FC<BetCardProps> = ({ bet, settings, onUpdate, onDelete, onPostToDiscord }) => {
+const BetCard: React.FC<BetCardProps> = ({ bet, settings, onUpdate, onDelete, onCopy, onPostToDiscord }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState(bet);
   const [isPosting, setIsPosting] = useState(false);
@@ -180,6 +181,14 @@ const BetCard: React.FC<BetCardProps> = ({ bet, settings, onUpdate, onDelete, on
                setIsEditing(true);
              }} className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700 rounded"><Edit2 size={16}/></button>
           )}
+          
+          <button 
+            onClick={() => onCopy(bet)}
+            className="p-1.5 text-purple-400 hover:text-white hover:bg-gray-700 rounded"
+            title="Copy Play"
+          >
+            <Copy size={16}/>
+          </button>
           
           <button 
             onClick={handlePost} 

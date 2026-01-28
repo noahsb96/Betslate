@@ -198,6 +198,20 @@ const App: React.FC = () => {
     setBets(prev => prev.filter(b => b.id !== id));
   };
 
+  const handleCopyBet = async (bet: Bet) => {
+    const copiedBet: Bet = {
+      ...bet,
+      id: uuidv4(),
+      timestamp: Date.now(),
+      isPosted: false,
+      autoPost: false,
+      result: BetResult.PENDING
+    };
+    await betsAPI.create(copiedBet);
+    setBets(prev => [copiedBet, ...prev]);
+    setScrollToBetId(copiedBet.id);
+  };
+
   const clearAllBets = async () => {
     if (window.confirm("Clear all bets? This cannot be undone.")) {
       await betsAPI.clearAll();
@@ -501,6 +515,7 @@ const App: React.FC = () => {
                     settings={appSettings}
                     onUpdate={handleUpdateBet}
                     onDelete={handleDeleteBet}
+                    onCopy={handleCopyBet}
                     onPostToDiscord={handlePostToDiscord}
                   />
                 ))
@@ -532,6 +547,7 @@ const App: React.FC = () => {
                     settings={appSettings}
                     onUpdate={handleUpdateBet}
                     onDelete={handleDeleteBet}
+                    onCopy={handleCopyBet}
                     onPostToDiscord={handlePostToDiscord}
                   />
                 ))
