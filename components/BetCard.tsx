@@ -6,7 +6,7 @@ import { Check, X, Clock, Edit2, Trash2, Save, Send, Loader2, CalendarClock, Set
 interface BetCardProps {
   bet: Bet;
   settings: AppSettings;
-  onUpdate: (id: string, updates: Partial<Bet>) => void;
+  onUpdate: (id: string, updates: Partial<Bet>, shouldScroll?: boolean) => void;
   onDelete: (id: string) => void;
   onPostToDiscord: (bet: Bet) => Promise<boolean>;
 }
@@ -77,7 +77,7 @@ const BetCard: React.FC<BetCardProps> = ({ bet, settings, onUpdate, onDelete, on
   };
 
   return (
-    <div className={`relative flex flex-col mb-4 rounded-md border-l-4 ${getStatusColor(bet.result)} shadow-lg transition-all`}>
+    <div id={`bet-${bet.id}`} className={`relative flex flex-col mb-4 rounded-md border-l-4 ${getStatusColor(bet.result)} shadow-lg transition-all`}>
       
       <div className="flex items-center space-x-3 p-4 bg-[#36393f] rounded-tr-md">
         {settings.botAvatarUrl ? (
@@ -130,7 +130,7 @@ const BetCard: React.FC<BetCardProps> = ({ bet, settings, onUpdate, onDelete, on
                       onBlur={(e) => {
                          if (e.target.value) {
                            const time = new Date(e.target.value).getTime();
-                           onUpdate(bet.id, { customScheduleTime: time, autoPost: true });
+                           onUpdate(bet.id, { customScheduleTime: time, autoPost: true }, true);
                          }
                          setShowScheduleEdit(false);
                          setTempScheduleTime('');

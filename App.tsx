@@ -29,6 +29,7 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'queue' | 'history'>('queue');
   const [slateDate, setSlateDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [appSettings, setAppSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
+  const [scrollToBetId, setScrollToBetId] = useState<string | null>(null);
 
   useEffect(() => {
      const loadData = async () => {
@@ -76,6 +77,18 @@ const App: React.FC = () => {
 
     return () => clearInterval(intervalId);
   }, []);
+
+  useEffect(() => {
+    if (scrollToBetId) {
+      setTimeout(() => {
+        const element = document.getElementById(`bet-${scrollToBetId}`);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        setScrollToBetId(null);
+      }, 50);
+    }
+  }, [scrollToBetId]);
 
   const parseMatchTime = (timeString: string, dateStr: string, timezone: string): number | undefined => {
     try {
@@ -149,9 +162,12 @@ const App: React.FC = () => {
     }
   };
 
-  const handleUpdateBet = async (id: string, updates: Partial<Bet>) => {
+  const handleUpdateBet = async (id: string, updates: Partial<Bet>, shouldScroll = false) => {
     await betsAPI.update(id, updates);
     setBets(prev => prev.map(b => b.id === id ? { ...b, ...updates } : b));
+    if (shouldScroll) {
+      setScrollToBetId(id);
+    }
   };
 
   const handleDeleteBet = async (id: string) => {
