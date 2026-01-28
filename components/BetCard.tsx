@@ -16,6 +16,7 @@ const BetCard: React.FC<BetCardProps> = ({ bet, settings, onUpdate, onDelete, on
   const [editForm, setEditForm] = useState(bet);
   const [isPosting, setIsPosting] = useState(false);
   const [showScheduleEdit, setShowScheduleEdit] = useState(false);
+  const [tempScheduleTime, setTempScheduleTime] = useState<string>('');
 
   const handleSave = () => {
     onUpdate(bet.id, editForm);
@@ -124,13 +125,22 @@ const BetCard: React.FC<BetCardProps> = ({ bet, settings, onUpdate, onDelete, on
                     <input 
                       type="datetime-local"
                       className="text-black text-xs p-1 rounded w-32"
-                      value={bet.customScheduleTime ? formatForInput(bet.customScheduleTime) : (effectiveTime ? formatForInput(effectiveTime) : '')}
-                      onChange={(e) => {
-                         const time = new Date(e.target.value).getTime();
-                         onUpdate(bet.id, { customScheduleTime: time, autoPost: true });
+                      value={tempScheduleTime || (bet.customScheduleTime ? formatForInput(bet.customScheduleTime) : (effectiveTime ? formatForInput(effectiveTime) : ''))}
+                      onChange={(e) => setTempScheduleTime(e.target.value)}
+                      onBlur={(e) => {
+                         if (e.target.value) {
+                           const time = new Date(e.target.value).getTime();
+                           onUpdate(bet.id, { customScheduleTime: time, autoPost: true });
+                         }
+                         setShowScheduleEdit(false);
+                         setTempScheduleTime('');
                       }}
+                      autoFocus
                     />
-                    <button onClick={() => setShowScheduleEdit(false)} className="text-gray-400 hover:text-white"><X size={14}/></button>
+                    <button onClick={() => {
+                      setShowScheduleEdit(false);
+                      setTempScheduleTime('');
+                    }} className="text-gray-400 hover:text-white"><X size={14}/></button>
                   </div>
                ) : (
                  <div 

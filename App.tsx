@@ -259,7 +259,11 @@ const App: React.FC = () => {
     }
   };
 
-  const queueBets = bets.filter(b => !b.isPosted);
+  const queueBets = bets.filter(b => !b.isPosted).sort((a, b) => {
+    const timeA = a.customScheduleTime || (a.matchTimestamp ? a.matchTimestamp - (appSettings.scheduleOffsetMinutes * 60000) : 0);
+    const timeB = b.customScheduleTime || (b.matchTimestamp ? b.matchTimestamp - (appSettings.scheduleOffsetMinutes * 60000) : 0);
+    return timeA - timeB;
+  });
   const historyBets = bets.filter(b => b.isPosted);
 
   return (
