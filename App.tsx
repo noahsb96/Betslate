@@ -18,6 +18,12 @@ const DEFAULT_SETTINGS: AppSettings = {
     scheduleOffsetMinutes: 15,
     slateTimezone: 'America/New_York',
     defaultOdds: '-120',
+    recapTitle: 'Daily Recap',
+    recapIncludeDate: true,
+    recapIncludeRecord: true,
+    recapIncludeNetUnits: true,
+    recapIncludeROI: true,
+    recapIncludeLeagueStats: false,
     aiInstructions: `You are an expert sports betting assistant specialized in Table Tennis.
 Your task is to analyze an image of a betting slate and extract the structured betting data.
 

@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Bet, BetResult, AppSettings } from '../types';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
-import { Send, Clock, CheckCircle } from 'lucide-react';
+import { Send, Clock, CheckCircle, ChevronDown, ChevronUp, Eye } from 'lucide-react';
 
 interface StatsOverviewProps {
   bets: Bet[];
@@ -14,6 +14,8 @@ interface StatsOverviewProps {
 const StatsOverview: React.FC<StatsOverviewProps> = ({ bets, settings, onUpdateSettings, onDeleteBet }) => {
   const [recapTime, setRecapTime] = useState<string>('');
   const [recapScheduled, setRecapScheduled] = useState(false);
+  const [showRecapSettings, setShowRecapSettings] = useState(false);
+  const [showRecapPreview, setShowRecapPreview] = useState(false);
 
   const finishedBets = bets.filter(b => b.result !== BetResult.PENDING);
   
@@ -77,6 +79,37 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({ bets, settings, onUpdateS
     return () => clearInterval(interval);
   }, [recapScheduled, recapTime, finishedBets]);
 
+  const buildRecapEmbed = () => {
+    const fields: Array<{ name: string; value: string; inline: boolean }> = [];
+    
+    if (settings.recapIncludeRecord) {
+      fields.push({ name: "Record", value: `${wins}-${losses}-${pushes}`, inline: true });
+    }
+    
+    if (settings.recapIncludeNetUnits) {
+      fields.push({ name: "Net Units", value: `${netUnits > 0 ? '+' : ''}${formattedNetUnits}u`, inline: true });
+    }
+    
+    if (settings.recapIncludeROI) {
+      const roi = finishedBets.length > 0 ? ((netUnits / finishedBets.reduce((a,b) => a+b.units,0)) * 100).toFixed(1) : 0;
+      fields.push({ name: "Total ROI", value: `${roi}%`, inline: true });
+    }
+    
+    if (settings.recapIncludeLeagueStats && barData.length > 0) {
+      const leagueStatsText = barData.map(d => `${d.name}: ${d.units > 0 ? '+' : ''}${d.units}u`).join('\n');
+      fields.push({ name: "League Breakdown", value: leagueStatsText, inline: false });
+    }
+    
+    const titleDate = settings.recapIncludeDate ? ` - ${new Date().toLocaleDateString()}` : '';
+    
+    return {
+      title: `${settings.recapTitle || 'Daily Recap'}${titleDate}`,
+      color: netUnits >= 0 ? 5763719 : 15548997,
+      fields: fields,
+      footer: { text: `${settings.botName || 'AI BetSlate Automator'} • Auto-Generated` }
+    };
+  };
+
   const handleSendRecap = async () => {
     const url = (settings.recapWebhookUrl && settings.recapWebhookUrl.trim()) ? settings.recapWebhookUrl : settings.discordWebhookUrl;
     
@@ -98,16 +131,7 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({ bets, settings, onUpdateS
     const payload = {
         username: settings.botName,
         avatar_url: settings.botAvatarUrl,
-        embeds: [{
-            title: `📅 Daily Recap - ${new Date().toLocaleDateString()}`,
-            color: netUnits >= 0 ? 5763719 : 15548997,
-            fields: [
-                { name: "Record", value: `${wins}-${losses}-${pushes}`, inline: true },
-                { name: "Net Units", value: `${netUnits > 0 ? '+' : ''}${formattedNetUnits}u`, inline: true },
-                { name: "Total ROI", value: `${finishedBets.length > 0 ? ((netUnits / finishedBets.reduce((a,b) => a+b.units,0)) * 100).toFixed(1) : 0}%`, inline: true }
-            ],
-            footer: { text: `${settings.botName || 'AI BetSlate Automator'} • Auto-Generated` }
-        }]
+        embeds: [buildRecapEmbed()]
     };
 
     try {
@@ -162,6 +186,113 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({ bets, settings, onUpdateS
                  </button>
              </div>
          </div>
+      </div>
+
+      <div className="bg-[#202225] p-4 rounded mb-6 border border-gray-700">
+         <button 
+           onClick={() => setShowRecapSettings(!showRecapSettings)}
+           className="w-full flex items-center justify-between text-sm font-bold text-gray-300 uppercase tracking-wide hover:text-white transition-colors"
+         >
+            <span className="flex items-center">
+              <Send size={14} className="mr-2"/> Recap Customization
+            </span>
+            {showRecapSettings ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
+         </button>
+         
+         {showRecapSettings && (
+           <div className="mt-4 space-y-4 animate-fade-in">
+             <div>
+               <label className="block text-xs text-gray-400 mb-1">Recap Title</label>
+               <input 
+                 type="text" 
+                 value={settings.recapTitle || 'Daily Recap'}
+                 onChange={(e) => onUpdateSettings({...settings, recapTitle: e.target.value})}
+                 placeholder="Daily Recap"
+                 className="w-full bg-[#2f3136] border border-gray-600 rounded px-2 py-1 text-sm focus:outline-none"
+               />
+             </div>
+
+             <div>
+               <label className="block text-xs text-gray-400 mb-2">Include in Recap</label>
+               <div className="grid grid-cols-2 gap-2">
+                 <label className="flex items-center space-x-2 cursor-pointer">
+                   <input 
+                     type="checkbox" 
+                     checked={settings.recapIncludeDate}
+                     onChange={(e) => onUpdateSettings({...settings, recapIncludeDate: e.target.checked})}
+                     className="rounded bg-gray-700 border-gray-600"
+                   />
+                   <span className="text-sm text-gray-300">Date in Title</span>
+                 </label>
+
+                 <label className="flex items-center space-x-2 cursor-pointer">
+                   <input 
+                     type="checkbox" 
+                     checked={settings.recapIncludeRecord}
+                     onChange={(e) => onUpdateSettings({...settings, recapIncludeRecord: e.target.checked})}
+                     className="rounded bg-gray-700 border-gray-600"
+                   />
+                   <span className="text-sm text-gray-300">Record (W-L-P)</span>
+                 </label>
+                 
+                 <label className="flex items-center space-x-2 cursor-pointer">
+                   <input 
+                     type="checkbox" 
+                     checked={settings.recapIncludeNetUnits}
+                     onChange={(e) => onUpdateSettings({...settings, recapIncludeNetUnits: e.target.checked})}
+                     className="rounded bg-gray-700 border-gray-600"
+                   />
+                   <span className="text-sm text-gray-300">Net Units</span>
+                 </label>
+                 
+                 <label className="flex items-center space-x-2 cursor-pointer">
+                   <input 
+                     type="checkbox" 
+                     checked={settings.recapIncludeROI}
+                     onChange={(e) => onUpdateSettings({...settings, recapIncludeROI: e.target.checked})}
+                     className="rounded bg-gray-700 border-gray-600"
+                   />
+                   <span className="text-sm text-gray-300">Total ROI</span>
+                 </label>
+                 
+                 <label className="flex items-center space-x-2 cursor-pointer">
+                   <input 
+                     type="checkbox" 
+                     checked={settings.recapIncludeLeagueStats}
+                     onChange={(e) => onUpdateSettings({...settings, recapIncludeLeagueStats: e.target.checked})}
+                     className="rounded bg-gray-700 border-gray-600"
+                   />
+                   <span className="text-sm text-gray-300">League Breakdown</span>
+                 </label>
+               </div>
+             </div>
+
+             <button 
+               onClick={() => setShowRecapPreview(!showRecapPreview)}
+               className="flex items-center text-xs px-3 py-2 bg-[#2f3136] hover:bg-[#40444b] rounded border border-gray-600 transition-colors"
+             >
+               <Eye size={14} className="mr-1"/> {showRecapPreview ? 'Hide' : 'Show'} Preview
+             </button>
+
+             {showRecapPreview && (
+               <div className="bg-[#36393f] p-4 rounded border border-gray-600">
+                 <div className="text-xs text-gray-400 mb-2">Discord Embed Preview:</div>
+                 <div className="bg-[#2f3136] rounded p-3 border-l-4" style={{borderColor: netUnits >= 0 ? '#57F287' : '#ED4245'}}>
+                   <div className="font-bold text-white mb-2">{buildRecapEmbed().title}</div>
+                   <div className="space-y-1">
+                     {buildRecapEmbed().fields.map((field, idx) => (
+                       <div key={idx} className={field.inline ? 'inline-block mr-4' : 'block'}>
+                         <div className="text-xs font-semibold text-gray-300">{field.name}</div>
+                         <div className="text-sm text-white whitespace-pre-line">{field.value}</div>
+                       </div>
+                     ))}
+                   </div>
+                   <div className="text-xs text-gray-500 mt-2">{buildRecapEmbed().footer.text}</div>
+                 </div>
+               </div>
+             )}
+           </div>
+         )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">

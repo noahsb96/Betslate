@@ -35,6 +35,12 @@ export interface AppSettings {
   slateTimezone: string;
   defaultOdds: string;
   aiInstructions: string;
+  recapTitle: string;
+  recapIncludeDate: boolean;
+  recapIncludeRecord: boolean;
+  recapIncludeNetUnits: boolean;
+  recapIncludeROI: boolean;
+  recapIncludeLeagueStats: boolean;
 }
 
 export interface UserAccount {

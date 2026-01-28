@@ -40,12 +40,28 @@ export const initDatabase = () => {
       scheduleOffsetMinutes INTEGER DEFAULT 15,
       slateTimezone TEXT DEFAULT 'America/New_York',
       defaultOdds TEXT DEFAULT '-120',
-      aiInstructions TEXT DEFAULT ''
+      aiInstructions TEXT DEFAULT '',
+      recapTitle TEXT DEFAULT 'Daily Recap',
+      recapIncludeDate INTEGER DEFAULT 1,
+      recapIncludeRecord INTEGER DEFAULT 1,
+      recapIncludeNetUnits INTEGER DEFAULT 1,
+      recapIncludeROI INTEGER DEFAULT 1,
+      recapIncludeLeagueStats INTEGER DEFAULT 0
     )
   `);
 
   try {
     db.exec(`ALTER TABLE settings ADD COLUMN aiInstructions TEXT DEFAULT ''`);
+  } catch (err) {
+  }
+
+  try {
+    db.exec(`ALTER TABLE settings ADD COLUMN recapTitle TEXT DEFAULT 'Daily Recap'`);
+    db.exec(`ALTER TABLE settings ADD COLUMN recapIncludeDate INTEGER DEFAULT 1`);
+    db.exec(`ALTER TABLE settings ADD COLUMN recapIncludeRecord INTEGER DEFAULT 1`);
+    db.exec(`ALTER TABLE settings ADD COLUMN recapIncludeNetUnits INTEGER DEFAULT 1`);
+    db.exec(`ALTER TABLE settings ADD COLUMN recapIncludeROI INTEGER DEFAULT 1`);
+    db.exec(`ALTER TABLE settings ADD COLUMN recapIncludeLeagueStats INTEGER DEFAULT 0`);
   } catch (err) {
   }
 
@@ -76,13 +92,35 @@ CRITICAL RULES:
   const settingsExists = db.prepare('SELECT COUNT(*) as count FROM settings WHERE id = 1').get();
   if (settingsExists.count === 0) {
     db.prepare(`
-      INSERT INTO settings (id, mentionString, botName, scheduleOffsetMinutes, slateTimezone, defaultOdds, aiInstructions)
-      VALUES (1, '@Chefs Plays', 'AI BetSlate Automator', 15, 'America/New_York', '-120', ?)
+      INSERT INTO settings (id, mentionString, botName, scheduleOffsetMinutes, slateTimezone, defaultOdds, aiInstructions, recapTitle, recapIncludeDate, recapIncludeRecord, recapIncludeNetUnits, recapIncludeROI, recapIncludeLeagueStats)
+      VALUES (1, '@Chefs Plays', 'AI BetSlate Automator', 15, 'America/New_York', '-120', ?, 'Daily Recap', 1, 1, 1, 1, 0)
     `).run(defaultInstructions);
   } else {
-    const currentSettings = db.prepare('SELECT aiInstructions FROM settings WHERE id = 1').get();
+    // Try to select from new columns, if they don't exist, migration will add them
+    let currentSettings;
+    try {
+      currentSettings = db.prepare('SELECT aiInstructions, recapTitle, recapIncludeDate FROM settings WHERE id = 1').get();
+    } catch (err) {
+      // Columns don't exist yet, just get basic settings and set defaults after migration
+      currentSettings = db.prepare('SELECT aiInstructions FROM settings WHERE id = 1').get();
+    }
+    
     if (!currentSettings.aiInstructions || currentSettings.aiInstructions === '') {
       db.prepare('UPDATE settings SET aiInstructions = ? WHERE id = 1').run(defaultInstructions);
+    }
+    
+    // Update recap columns if they exist and have null values
+    if (currentSettings.recapIncludeDate !== undefined) {
+      if (currentSettings.recapIncludeDate === null || currentSettings.recapIncludeDate === undefined) {
+        db.prepare(`UPDATE settings SET 
+          recapTitle = COALESCE(recapTitle, 'Daily Recap'),
+          recapIncludeDate = COALESCE(recapIncludeDate, 1),
+          recapIncludeRecord = COALESCE(recapIncludeRecord, 1),
+          recapIncludeNetUnits = COALESCE(recapIncludeNetUnits, 1),
+          recapIncludeROI = COALESCE(recapIncludeROI, 1),
+          recapIncludeLeagueStats = COALESCE(recapIncludeLeagueStats, 0)
+        WHERE id = 1`).run();
+      }
     }
   }
 
