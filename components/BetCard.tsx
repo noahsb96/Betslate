@@ -50,6 +50,20 @@ const BetCard: React.FC<BetCardProps> = ({ bet, settings, onUpdate, onDelete, on
 
   const toggleAutoSchedule = () => {
     if (bet.isPosted) return;
+    
+    // Check if enabling auto-schedule on a bet scheduled in the past
+    if (!bet.autoPost) {
+      const effectiveScheduleTime = bet.customScheduleTime 
+        ? bet.customScheduleTime 
+        : (bet.matchTimestamp ? bet.matchTimestamp - (settings.scheduleOffsetMinutes * 60000) : 0);
+      
+      if (effectiveScheduleTime > 0 && effectiveScheduleTime < Date.now()) {
+        const minutesAgo = Math.round((Date.now() - effectiveScheduleTime) / 60000);
+        alert(`Cannot enable auto-schedule: This bet was scheduled ${minutesAgo} minute${minutesAgo !== 1 ? 's' : ''} ago. Please update the schedule time or post it manually.`);
+        return;
+      }
+    }
+    
     onUpdate(bet.id, { autoPost: !bet.autoPost });
   };
 
@@ -77,7 +91,16 @@ const BetCard: React.FC<BetCardProps> = ({ bet, settings, onUpdate, onDelete, on
   const minutesAgo = isScheduledInPast ? Math.round((Date.now() - effectiveTime) / 60000) : 0;
 
   const scheduleDisplay = effectiveTime > 0 
-    ? new Date(effectiveTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' })
+    ? new Date(effectiveTime).toLocaleTimeString('en-US', { 
+        hour: '2-digit', 
+        minute: '2-digit', 
+        month: 'short', 
+        day: 'numeric',
+        timeZone: settings.slateTimezone || 'America/New_York'
+      }) + ` ${settings.slateTimezone === 'America/New_York' ? 'EST' : 
+              settings.slateTimezone === 'America/Chicago' ? 'CST' :
+              settings.slateTimezone === 'America/Denver' ? 'MST' :
+              settings.slateTimezone === 'America/Los_Angeles' ? 'PST' : 'EST'}`
     : 'Not Scheduled';
 
   const getInitials = (name: string) => {
@@ -87,9 +110,20 @@ const BetCard: React.FC<BetCardProps> = ({ bet, settings, onUpdate, onDelete, on
   };
 
   const formatForInput = (timestamp: number) => {
+    const userTimezone = settings.slateTimezone || 'America/New_York';
     const date = new Date(timestamp);
-    const offset = date.getTimezoneOffset() * 60000;
-    return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+    
+    const formatted = new Intl.DateTimeFormat('sv-SE', {
+      timeZone: userTimezone,
+      year: 'numeric',
+      month: '2-digit', 
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    }).format(date);
+    
+    return formatted.replace(' ', 'T');
   };
 
   return (
@@ -145,8 +179,40 @@ const BetCard: React.FC<BetCardProps> = ({ bet, settings, onUpdate, onDelete, on
                       onChange={(e) => setTempScheduleTime(e.target.value)}
                       onBlur={(e) => {
                          if (e.target.value) {
-                           const time = new Date(e.target.value).getTime();
-                           onUpdate(bet.id, { customScheduleTime: time, autoPost: true }, true);
+                           const inputValue = e.target.value;
+                           const [datePart, timePart] = inputValue.split('T');
+                           const [year, month, day] = datePart.split('-').map(Number);
+                           const [hour, minute] = timePart.split(':').map(Number);
+                           
+                           const userTimezone = settings.slateTimezone || 'America/New_York';
+                           
+                           // Create UTC timestamp
+                           const testUTC = Date.UTC(year, month - 1, day, hour, minute);
+                           const testDate = new Date(testUTC);
+                           
+                           // Format it back in the user's timezone to see what it would be
+                           const formattedInUserTZ = new Intl.DateTimeFormat('sv-SE', {
+                             timeZone: userTimezone,
+                             year: 'numeric',
+                             month: '2-digit',
+                             day: '2-digit',
+                             hour: '2-digit',
+                             minute: '2-digit',
+                             hour12: false
+                           }).format(testDate);
+                           
+                           const [fDate, fTime] = formattedInUserTZ.split(' ');
+                           const [fYear, fMonth, fDay] = fDate.split('-').map(Number);
+                           const [fHour, fMin] = fTime.split(':').map(Number);
+                           
+                           // Calculate difference and adjust
+                           const hourDiff = hour - fHour;
+                           const minDiff = minute - fMin;
+                           const offsetMs = (hourDiff * 60 + minDiff) * 60 * 1000;
+                           
+                           const finalTimestamp = testUTC + offsetMs;
+                           
+                           onUpdate(bet.id, { customScheduleTime: finalTimestamp, autoPost: true }, true);
                          }
                          setShowScheduleEdit(false);
                          setTempScheduleTime('');

@@ -137,9 +137,35 @@ const App: React.FC = () => {
 
       const [year, month, day] = dateStr.split('-').map(Number);
       
-      // Parse as server's local time (no timezone conversion)
+      // Map IANA timezone names to short codes for offset calculation
+      const timezoneMap: { [key: string]: string } = {
+        'America/New_York': 'EST',
+        'America/Chicago': 'CST',
+        'America/Denver': 'MST',
+        'America/Los_Angeles': 'PST'
+      };
+      
+      const shortTz = timezoneMap[timezone] || 'EST';
+      
       const localDate = new Date(year, month - 1, day, hours, minutes, 0);
-      return localDate.getTime();
+      
+      const timezoneOffsets: { [key: string]: number } = {
+        'EST': -5,
+        'EDT': -4,
+        'CST': -6,
+        'CDT': -5,
+        'MST': -7,
+        'MDT': -6,
+        'PST': -8,
+        'PDT': -7 
+      };
+      
+      const targetTzOffset = timezoneOffsets[shortTz] || -5;
+      const localTzOffset = -localDate.getTimezoneOffset() / 60;
+      
+      const offsetDiff = (targetTzOffset - localTzOffset) * 60 * 60 * 1000;
+      
+      return localDate.getTime() - offsetDiff;
     } catch (e) {
       console.error('Error parsing match time:', e);
       return undefined;
@@ -253,15 +279,30 @@ const App: React.FC = () => {
   const handleScheduleAll = async () => {
     const confirm = window.confirm(`Schedule all queued bets to auto-post ${appSettings.scheduleOffsetMinutes} mins before start?`);
     if (confirm) {
+      const now = Date.now();
       const updatePromises: Promise<void>[] = [];
+      let skippedCount = 0;
+      
       setBets(prev => prev.map(b => {
-        if (!b.isPosted && b.matchTimestamp && b.matchTimestamp > Date.now()) {
-          updatePromises.push(betsAPI.update(b.id, { autoPost: true }));
-          return { ...b, autoPost: true };
+        if (!b.isPosted && b.matchTimestamp) {
+          const scheduleTime = b.matchTimestamp - (appSettings.scheduleOffsetMinutes * 60000);
+          
+          // Only schedule if the scheduled time is in the future
+          if (scheduleTime > now) {
+            updatePromises.push(betsAPI.update(b.id, { autoPost: true }));
+            return { ...b, autoPost: true };
+          } else {
+            skippedCount++;
+          }
         }
         return b;
       }));
+      
       await Promise.all(updatePromises);
+      
+      if (skippedCount > 0) {
+        alert(`Scheduled ${updatePromises.length} bet${updatePromises.length !== 1 ? 's' : ''}. Skipped ${skippedCount} bet${skippedCount !== 1 ? 's' : ''} scheduled in the past.`);
+      }
     }
   };
 
