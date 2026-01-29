@@ -374,7 +374,7 @@ const App: React.FC = () => {
       <main className="max-w-4xl mx-auto p-4 md:p-6">
         
         {showSettings && (
-          <div className="bg-[#2f3136] rounded-lg p-6 mb-8 border border-gray-700 shadow-xl animate-fade-in relative z-50">
+          <div className="bg-[#2f3136] rounded-lg p-4 md:p-6 mb-8 border border-gray-700 shadow-xl animate-fade-in relative z-50 max-w-full overflow-x-hidden">
              <button onClick={() => setShowSettings(false)} className="absolute top-4 right-4 text-gray-500 hover:text-white"><X size={20}/></button>
             <h3 className="text-lg font-bold mb-4 flex items-center border-b border-gray-700 pb-2">
               <Settings size={18} className="mr-2" /> Application Settings
@@ -490,7 +490,7 @@ const App: React.FC = () => {
                      <p className="text-xs text-gray-500 mt-1">Title shown in Discord for bet alerts (can be overridden per bet)</p>
                    </div>
 
-                   <div className="grid grid-cols-2 gap-4">
+                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                      <div>
                        <label className="block text-sm text-gray-400 mb-1">Bet Alert Color</label>
                        <div className="flex space-x-2">
@@ -544,18 +544,18 @@ const App: React.FC = () => {
           </div>
         )}
 
-        <div className="flex space-x-2 mb-6 border-b border-gray-700 pb-1">
+        <div className="flex space-x-2 mb-6 border-b border-gray-700 pb-1 overflow-x-auto">
           <button 
             onClick={() => setActiveTab('queue')}
-            className={`flex items-center px-4 py-2 font-medium transition-all rounded-t-lg ${activeTab === 'queue' ? 'bg-[#2f3136] text-white border-t border-l border-r border-gray-600' : 'text-gray-400 hover:text-white hover:bg-[#2f3136]/50'}`}
+            className={`flex items-center px-3 md:px-4 py-2 font-medium transition-all rounded-t-lg whitespace-nowrap ${activeTab === 'queue' ? 'bg-[#2f3136] text-white border-t border-l border-r border-gray-600' : 'text-gray-400 hover:text-white hover:bg-[#2f3136]/50'}`}
           >
-            <Layers size={16} className="mr-2"/> Queue ({queueBets.length})
+            <Layers size={16} className="mr-1 md:mr-2"/> Queue ({queueBets.length})
           </button>
           <button 
             onClick={() => setActiveTab('history')}
-            className={`flex items-center px-4 py-2 font-medium transition-all rounded-t-lg ${activeTab === 'history' ? 'bg-[#2f3136] text-white border-t border-l border-r border-gray-600' : 'text-gray-400 hover:text-white hover:bg-[#2f3136]/50'}`}
+            className={`flex items-center px-3 md:px-4 py-2 font-medium transition-all rounded-t-lg whitespace-nowrap ${activeTab === 'history' ? 'bg-[#2f3136] text-white border-t border-l border-r border-gray-600' : 'text-gray-400 hover:text-white hover:bg-[#2f3136]/50'}`}
           >
-            <FileText size={16} className="mr-2"/> History & Stats ({historyBets.length})
+            <FileText size={16} className="mr-1 md:mr-2"/> History & Stats ({historyBets.length})
           </button>
         </div>
 

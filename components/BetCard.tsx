@@ -95,7 +95,7 @@ const BetCard: React.FC<BetCardProps> = ({ bet, settings, onUpdate, onDelete, on
   return (
     <div id={`bet-${bet.id}`} className={`relative flex flex-col mb-4 rounded-md border-l-4 ${getStatusColor(bet.result)} shadow-lg transition-all`}>
       
-      <div className="flex items-center space-x-3 p-4 bg-[#36393f] rounded-tr-md">
+      <div className="flex items-center space-x-2 md:space-x-3 p-3 md:p-4 bg-[#36393f] rounded-tr-md">
         {settings.botAvatarUrl ? (
           <img src={settings.botAvatarUrl} alt="Bot" className="w-10 h-10 rounded-full object-cover" />
         ) : (
@@ -123,17 +123,18 @@ const BetCard: React.FC<BetCardProps> = ({ bet, settings, onUpdate, onDelete, on
           </div>
         </div>
         
-        <div className="ml-auto flex items-center space-x-2">
+        <div className="ml-auto flex items-center space-x-1 md:space-x-2 flex-shrink-0">
           
           {!bet.isPosted && (
-             <div className="flex items-center space-x-1 mr-2 bg-[#202225] rounded p-1">
+             <div className="flex items-center space-x-1 mr-1 md:mr-2 bg-[#202225] rounded p-0.5 md:p-1">
                <button 
                  onClick={toggleAutoSchedule}
-                 className={`flex items-center px-2 py-1 rounded text-xs transition-colors border ${bet.autoPost ? 'bg-indigo-900/50 border-indigo-500 text-indigo-300' : 'border-gray-600 text-gray-500 hover:text-gray-300'}`}
+                 className={`flex items-center px-1.5 md:px-2 py-1 rounded text-xs transition-colors border ${bet.autoPost ? 'bg-indigo-900/50 border-indigo-500 text-indigo-300' : 'border-gray-600 text-gray-500 hover:text-gray-300'}`}
                  title={bet.autoPost ? 'Click to Disable Auto-Schedule' : 'Click to Auto-Schedule'}
                >
-                 <CalendarClock size={14} className="mr-1" />
-                 {bet.autoPost ? 'On' : 'Off'}
+                 <CalendarClock size={14} className="mr-0.5 md:mr-1" />
+                 <span className="hidden sm:inline">{bet.autoPost ? 'On' : 'Off'}</span>
+                 <span className="sm:hidden">{bet.autoPost ? '✓' : '○'}</span>
                </button>
                
                {showScheduleEdit ? (
@@ -212,7 +213,7 @@ const BetCard: React.FC<BetCardProps> = ({ bet, settings, onUpdate, onDelete, on
         </div>
       </div>
 
-      <div className="p-4 bg-[#2f3136] rounded-br-md text-gray-100 pl-16 pt-0">
+      <div className="p-3 md:p-4 bg-[#2f3136] rounded-br-md text-gray-100 pl-12 md:pl-16 pt-0">
         <div 
           className="bg-[#202225] border-l-4 rounded p-4 mt-2 max-w-md shadow-sm"
           style={{ borderLeftColor: `#${settings.betEmbedColor.toString(16).padStart(6, '0')}` }}
