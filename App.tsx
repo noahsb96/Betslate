@@ -137,25 +137,9 @@ const App: React.FC = () => {
 
       const [year, month, day] = dateStr.split('-').map(Number);
       
+      // Parse as server's local time (no timezone conversion)
       const localDate = new Date(year, month - 1, day, hours, minutes, 0);
-      
-      const timezoneOffsets = {
-        'EST': -5,
-        'EDT': -4,
-        'CST': -6,
-        'CDT': -5,
-        'MST': -7,
-        'MDT': -6,
-        'PST': -8,
-        'PDT': -7 
-      };
-      
-      const targetTzOffset = timezoneOffsets[timezone] || -5;
-      const localTzOffset = -localDate.getTimezoneOffset() / 60;
-      
-      const offsetDiff = (targetTzOffset - localTzOffset) * 60 * 60 * 1000;
-      
-      return localDate.getTime() + offsetDiff;
+      return localDate.getTime();
     } catch (e) {
       console.error('Error parsing match time:', e);
       return undefined;

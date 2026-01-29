@@ -93,22 +93,22 @@ const BetCard: React.FC<BetCardProps> = ({ bet, settings, onUpdate, onDelete, on
   };
 
   return (
-    <div id={`bet-${bet.id}`} className={`relative flex flex-col mb-4 rounded-md border-l-4 ${getStatusColor(bet.result)} shadow-lg transition-all`}>
+    <div id={`bet-${bet.id}`} className={`relative flex flex-col mb-4 rounded-md border-l-4 ${getStatusColor(bet.result)} shadow-lg transition-all overflow-hidden`}>
       
-      <div className="flex items-center space-x-2 md:space-x-3 p-3 md:p-4 bg-[#36393f] rounded-tr-md">
+      <div className="flex items-center gap-1 sm:gap-2 md:gap-3 p-2 sm:p-3 md:p-4 bg-[#36393f] rounded-tr-md">
         {settings.botAvatarUrl ? (
-          <img src={settings.botAvatarUrl} alt="Bot" className="w-10 h-10 rounded-full object-cover" />
+          <img src={settings.botAvatarUrl} alt="Bot" className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover flex-shrink-0" />
         ) : (
-          <div className="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold text-xs">
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
             {getInitials(settings.botName || 'AI BetSlate Automator')}
           </div>
         )}
         
-        <div className="flex flex-col">
-          <div className="flex items-center space-x-2">
-            <span className="font-semibold text-white">{settings.botName || 'AI BetSlate Automator'}</span>
-            <span className="bg-[#5865f2] text-[10px] text-white px-1 rounded">APP</span>
-            <span className="text-gray-400 text-xs">
+        <div className="flex flex-col min-w-0 flex-1">
+          <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
+            <span className="font-semibold text-white text-sm sm:text-base truncate">{settings.botName || 'AI BetSlate Automator'}</span>
+            <span className="bg-[#5865f2] text-[10px] text-white px-1 rounded flex-shrink-0">APP</span>
+            <span className="text-gray-400 text-xs flex-shrink-0">
               {bet.isPosted ? 'Posted' : `Starts at ${bet.time}`}
             </span>
           </div>
@@ -123,22 +123,21 @@ const BetCard: React.FC<BetCardProps> = ({ bet, settings, onUpdate, onDelete, on
           </div>
         </div>
         
-        <div className="ml-auto flex items-center space-x-1 md:space-x-2 flex-shrink-0">
+        <div className="flex items-center gap-0.5 sm:gap-1 md:gap-2 flex-shrink-0">
           
           {!bet.isPosted && (
-             <div className="flex items-center space-x-1 mr-1 md:mr-2 bg-[#202225] rounded p-0.5 md:p-1">
+             <div className="flex items-center gap-0.5 sm:gap-1 bg-[#202225] rounded p-0.5 md:p-1">
                <button 
                  onClick={toggleAutoSchedule}
-                 className={`flex items-center px-1.5 md:px-2 py-1 rounded text-xs transition-colors border ${bet.autoPost ? 'bg-indigo-900/50 border-indigo-500 text-indigo-300' : 'border-gray-600 text-gray-500 hover:text-gray-300'}`}
+                 className={`flex items-center px-1 sm:px-1.5 md:px-2 py-1 rounded text-xs transition-colors border ${bet.autoPost ? 'bg-indigo-900/50 border-indigo-500 text-indigo-300' : 'border-gray-600 text-gray-500 hover:text-gray-300'}`}
                  title={bet.autoPost ? 'Click to Disable Auto-Schedule' : 'Click to Auto-Schedule'}
                >
-                 <CalendarClock size={14} className="mr-0.5 md:mr-1" />
-                 <span className="hidden sm:inline">{bet.autoPost ? 'On' : 'Off'}</span>
-                 <span className="sm:hidden">{bet.autoPost ? '✓' : '○'}</span>
+                 <CalendarClock size={12} className="sm:mr-1" />
+                 <span className="hidden sm:inline text-[10px] sm:text-xs">{bet.autoPost ? 'On' : 'Off'}</span>
                </button>
                
                {showScheduleEdit ? (
-                  <div className="flex items-center space-x-1 animate-fade-in">
+                  <div className="flex items-center gap-1 animate-fade-in">
                     <input 
                       type="datetime-local"
                       className="text-black text-xs p-1 rounded w-32"
@@ -162,53 +161,53 @@ const BetCard: React.FC<BetCardProps> = ({ bet, settings, onUpdate, onDelete, on
                ) : (
                  <div 
                    onClick={() => setShowScheduleEdit(true)}
-                   className={`flex items-center text-xs cursor-pointer hover:text-white px-2 ${
+                   className={`flex items-center text-[10px] sm:text-xs cursor-pointer hover:text-white px-1 sm:px-2 whitespace-nowrap ${
                      isScheduledInPast ? 'text-yellow-300' : 'text-gray-400'
                    }`}
                    title={isScheduledInPast ? `Scheduled ${minutesAgo} minute${minutesAgo !== 1 ? 's' : ''} ago - will not auto-post` : 'Click to edit schedule time'}
                  >
-                   {isScheduledInPast && <span className="mr-1">⚠️</span>}
-                   <span>{scheduleDisplay}</span>
-                   <Settings2 size={12} className="ml-1 opacity-50"/>
+                   {isScheduledInPast && <span className="mr-0.5 sm:mr-1">⚠️</span>}
+                   <span className="truncate max-w-[100px] sm:max-w-none">{scheduleDisplay}</span>
+                   <Settings2 size={10} className="ml-0.5 sm:ml-1 opacity-50 flex-shrink-0"/>
                  </div>
                )}
              </div>
           )}
 
           {bet.isPosted && (
-             <span className="text-xs text-green-500 font-bold border border-green-900 bg-green-900/20 px-2 py-1 rounded mr-2">
+             <span className="text-[10px] sm:text-xs text-green-500 font-bold border border-green-900 bg-green-900/20 px-1 sm:px-2 py-0.5 sm:py-1 rounded flex-shrink-0">
                SENT
              </span>
           )}
 
           {isEditing ? (
-             <button onClick={handleSave} className="p-1.5 text-green-400 hover:bg-gray-700 rounded"><Save size={16}/></button>
+             <button onClick={handleSave} className="p-1 sm:p-1.5 text-green-400 hover:bg-gray-700 rounded"><Save size={14}/></button>
           ) : (
              <button onClick={() => {
                setEditForm(bet);
                setIsEditing(true);
-             }} className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700 rounded"><Edit2 size={16}/></button>
+             }} className="p-1 sm:p-1.5 text-gray-400 hover:text-white hover:bg-gray-700 rounded"><Edit2 size={14}/></button>
           )}
           
           <button 
             onClick={() => onCopy(bet)}
-            className="p-1.5 text-purple-400 hover:text-white hover:bg-gray-700 rounded"
+            className="p-1 sm:p-1.5 text-purple-400 hover:text-white hover:bg-gray-700 rounded"
             title="Copy Play"
           >
-            <Copy size={16}/>
+            <Copy size={14}/>
           </button>
           
           <button 
             onClick={handlePost} 
             disabled={isPosting || bet.isPosted}
-            className={`p-1.5 rounded transition-colors ${bet.isPosted ? 'text-gray-600 cursor-not-allowed' : 'text-blue-400 hover:text-white hover:bg-blue-600/50'}`}
+            className={`p-1 sm:p-1.5 rounded transition-colors ${bet.isPosted ? 'text-gray-600 cursor-not-allowed' : 'text-blue-400 hover:text-white hover:bg-blue-600/50'}`}
             title="Post Now (Immediate)"
           >
-             {isPosting ? <Loader2 size={16} className="animate-spin" /> : <Send size={16}/>}
+             {isPosting ? <Loader2 size={14} className="animate-spin" /> : <Send size={14}/>}
           </button>
 
-          <button onClick={handleDelete} className="p-1.5 text-red-400 hover:bg-gray-700 rounded z-10">
-            <Trash2 size={16}/>
+          <button onClick={handleDelete} className="p-1 sm:p-1.5 text-red-400 hover:bg-gray-700 rounded z-10">
+            <Trash2 size={14}/>
           </button>
         </div>
       </div>
