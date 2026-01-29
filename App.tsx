@@ -580,17 +580,17 @@ const App: React.FC = () => {
               </div>
               
               <div className="flex flex-col space-y-3 justify-center">
-                 <button onClick={handleManualAdd} className="flex items-center justify-center p-4 bg-[#2f3136] hover:bg-[#40444b] rounded-lg border border-gray-700 transition-colors">
-                    <Plus size={20} className="mr-2 text-green-400"/> <span className="font-semibold">Add Manual Play</span>
+                 <button onClick={handleManualAdd} className="flex items-center justify-center p-3 md:p-4 bg-[#2f3136] hover:bg-[#40444b] rounded-lg border border-gray-700 transition-colors">
+                    <Plus size={18} className="mr-2 text-green-400 flex-shrink-0"/> <span className="font-semibold text-sm md:text-base">Add Manual Play</span>
                  </button>
                  
-                 <button onClick={handleScheduleAll} className="flex items-center justify-center p-4 bg-[#2f3136] hover:bg-indigo-900/20 hover:border-indigo-500 rounded-lg border border-gray-700 transition-colors">
-                    <Clock size={20} className="mr-2 text-indigo-400"/> <span className="font-semibold text-indigo-100">Schedule All</span>
+                 <button onClick={handleScheduleAll} className="flex items-center justify-center p-3 md:p-4 bg-[#2f3136] hover:bg-indigo-900/20 hover:border-indigo-500 rounded-lg border border-gray-700 transition-colors">
+                    <Clock size={18} className="mr-2 text-indigo-400 flex-shrink-0"/> <span className="font-semibold text-indigo-100 text-sm md:text-base">Schedule All</span>
                  </button>
 
                  {queueBets.length > 0 && (
-                   <button onClick={clearAllBets} className="flex items-center justify-center p-4 bg-[#2f3136] hover:bg-red-900/20 hover:border-red-500 rounded-lg border border-gray-700 transition-colors">
-                      <Trash size={20} className="mr-2 text-red-400"/> <span className="font-semibold text-red-100">Clear All Queue</span>
+                   <button onClick={clearAllBets} className="flex items-center justify-center p-3 md:p-4 bg-[#2f3136] hover:bg-red-900/20 hover:border-red-500 rounded-lg border border-gray-700 transition-colors">
+                      <Trash size={18} className="mr-2 text-red-400 flex-shrink-0"/> <span className="font-semibold text-red-100 text-sm md:text-base">Clear All Queue</span>
                    </button>
                  )}
               </div>

@@ -215,10 +215,10 @@ const BetCard: React.FC<BetCardProps> = ({ bet, settings, onUpdate, onDelete, on
 
       <div className="p-3 md:p-4 bg-[#2f3136] rounded-br-md text-gray-100 pl-12 md:pl-16 pt-0">
         <div 
-          className="bg-[#202225] border-l-4 rounded p-4 mt-2 max-w-md shadow-sm"
+          className="bg-[#202225] border-l-4 rounded p-3 md:p-4 mt-2 max-w-full md:max-w-md shadow-sm overflow-hidden"
           style={{ borderLeftColor: `#${settings.betEmbedColor.toString(16).padStart(6, '0')}` }}
         >
-          <div className="flex items-center text-white font-bold mb-2">
+          <div className="flex items-center text-white font-bold mb-2 break-words">
              {bet.customTitle || settings.defaultBetAlertTitle}
           </div>
           
@@ -241,22 +241,22 @@ const BetCard: React.FC<BetCardProps> = ({ bet, settings, onUpdate, onDelete, on
                     <input className="bg-gray-700 text-white px-2 py-1 rounded w-full" value={editForm.playerB} onChange={e => setEditForm({...editForm, playerB: e.target.value})} />
                   </div>
                </div>
-               <div className="grid grid-cols-4 gap-2">
-                 <div className="col-span-1">
+               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                 <div>
                     <label className="block text-xs text-gray-400">Type</label>
-                    <input className="bg-gray-700 text-white px-2 py-1 rounded w-full" value={editForm.type} onChange={e => setEditForm({...editForm, type: e.target.value})} />
+                    <input className="bg-gray-700 text-white px-2 py-1 rounded w-full text-sm" value={editForm.type} onChange={e => setEditForm({...editForm, type: e.target.value})} />
                  </div>
-                 <div className="col-span-1">
+                 <div>
                     <label className="block text-xs text-gray-400">Units</label>
-                    <input type="number" step="0.5" className="bg-gray-700 text-white px-2 py-1 rounded w-full" value={editForm.units} onChange={e => setEditForm({...editForm, units: Number(e.target.value)})} />
+                    <input type="number" step="0.5" className="bg-gray-700 text-white px-2 py-1 rounded w-full text-sm" value={editForm.units} onChange={e => setEditForm({...editForm, units: Number(e.target.value)})} />
                  </div>
-                 <div className="col-span-1">
+                 <div>
                     <label className="block text-xs text-gray-400">Odds</label>
-                    <input className="bg-gray-700 text-white px-2 py-1 rounded w-full" placeholder="-120" value={editForm.odds || ''} onChange={e => setEditForm({...editForm, odds: e.target.value})} />
+                    <input className="bg-gray-700 text-white px-2 py-1 rounded w-full text-sm" placeholder="-120" value={editForm.odds || ''} onChange={e => setEditForm({...editForm, odds: e.target.value})} />
                  </div>
-                 <div className="col-span-1">
+                 <div>
                     <label className="block text-xs text-gray-400">League</label>
-                    <input className="bg-gray-700 text-white px-2 py-1 rounded w-full" value={editForm.league} onChange={e => setEditForm({...editForm, league: e.target.value})} />
+                    <input className="bg-gray-700 text-white px-2 py-1 rounded w-full text-sm" value={editForm.league} onChange={e => setEditForm({...editForm, league: e.target.value})} />
                  </div>
                </div>
                <div>
@@ -268,21 +268,21 @@ const BetCard: React.FC<BetCardProps> = ({ bet, settings, onUpdate, onDelete, on
             <>
               <div className="mb-2">
                 <div className="text-xs font-bold text-white mb-0.5">Match</div>
-                <div className="text-sm text-gray-300">{bet.playerA} vs {bet.playerB}</div>
+                <div className="text-sm text-gray-300 break-words">{bet.playerA} vs {bet.playerB}</div>
               </div>
               
-              <div className="grid grid-cols-3 gap-4 mb-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-4 mb-2">
                 <div>
                    <div className="text-xs font-bold text-white">Type</div>
-                   <div className="text-sm text-gray-300 uppercase">{bet.type}</div>
+                   <div className="text-sm text-gray-300 uppercase break-words">{bet.type}</div>
                 </div>
                 <div>
                    <div className="text-xs font-bold text-white">Units</div>
-                   <div className="text-sm text-gray-300">{bet.units}u <span className="text-gray-500 text-[10px]">{bet.odds || settings.defaultOdds}</span></div>
+                   <div className="text-sm text-gray-300 break-words">{bet.units}u <span className="text-gray-500 text-[10px]">{bet.odds || settings.defaultOdds}</span></div>
                 </div>
-                <div>
+                <div className="col-span-2 sm:col-span-1">
                    <div className="text-xs font-bold text-white">League</div>
-                   <div className="text-sm text-gray-300">{bet.league}</div>
+                   <div className="text-sm text-gray-300 break-words">{bet.league}</div>
                 </div>
               </div>
 
