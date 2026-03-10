@@ -136,36 +136,41 @@ const App: React.FC = () => {
       if (meridian === 'am' && hours === 12) hours = 0;
 
       const [year, month, day] = dateStr.split('-').map(Number);
-      
-      // Map IANA timezone names to short codes for offset calculation
-      const timezoneMap: { [key: string]: string } = {
-        'America/New_York': 'EST',
-        'America/Chicago': 'CST',
-        'America/Denver': 'MST',
-        'America/Los_Angeles': 'PST'
-      };
-      
-      const shortTz = timezoneMap[timezone] || 'EST';
-      
-      const localDate = new Date(year, month - 1, day, hours, minutes, 0);
-      
-      const timezoneOffsets: { [key: string]: number } = {
-        'EST': -5,
-        'EDT': -4,
-        'CST': -6,
-        'CDT': -5,
-        'MST': -7,
-        'MDT': -6,
-        'PST': -8,
-        'PDT': -7 
-      };
-      
-      const targetTzOffset = timezoneOffsets[shortTz] || -5;
-      const localTzOffset = -localDate.getTimezoneOffset() / 60;
-      
-      const offsetDiff = (targetTzOffset - localTzOffset) * 60 * 60 * 1000;
-      
-      return localDate.getTime() - offsetDiff;
+
+      // Build a naive UTC timestamp as if the local time were UTC, then use
+      // Intl.DateTimeFormat to find out what that UTC instant looks like in the
+      // target IANA timezone. The difference gives the true UTC offset for that
+      // date (including DST), so we can compute the correct UTC timestamp without
+      // any hardcoded, DST-unaware offset tables.
+      const naiveUTC = Date.UTC(year, month - 1, day, hours, minutes, 0);
+
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: timezone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+      });
+
+      const parts = Object.fromEntries(
+        formatter.formatToParts(new Date(naiveUTC)).map(p => [p.type, p.value])
+      );
+
+      const displayedH = parseInt(parts.hour) % 24; // normalize 24:xx → 0:xx
+      const displayedUTC = Date.UTC(
+        parseInt(parts.year),
+        parseInt(parts.month) - 1,
+        parseInt(parts.day),
+        displayedH,
+        parseInt(parts.minute),
+        parseInt(parts.second),
+      );
+
+      // naiveUTC - displayedUTC is the timezone's UTC offset in ms for this date.
+      return naiveUTC + (naiveUTC - displayedUTC);
     } catch (e) {
       console.error('Error parsing match time:', e);
       return undefined;

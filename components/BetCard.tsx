@@ -91,16 +91,14 @@ const BetCard: React.FC<BetCardProps> = ({ bet, settings, onUpdate, onDelete, on
   const minutesAgo = isScheduledInPast ? Math.round((Date.now() - effectiveTime) / 60000) : 0;
 
   const scheduleDisplay = effectiveTime > 0 
-    ? new Date(effectiveTime).toLocaleTimeString('en-US', { 
+    ? new Date(effectiveTime).toLocaleString('en-US', { 
         hour: '2-digit', 
         minute: '2-digit', 
         month: 'short', 
         day: 'numeric',
-        timeZone: settings.slateTimezone || 'America/New_York'
-      }) + ` ${settings.slateTimezone === 'America/New_York' ? 'EST' : 
-              settings.slateTimezone === 'America/Chicago' ? 'CST' :
-              settings.slateTimezone === 'America/Denver' ? 'MST' :
-              settings.slateTimezone === 'America/Los_Angeles' ? 'PST' : 'EST'}`
+        timeZone: settings.slateTimezone || 'America/New_York',
+        timeZoneName: 'short',
+      })
     : 'Not Scheduled';
 
   const getInitials = (name: string) => {
