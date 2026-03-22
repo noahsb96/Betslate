@@ -1,61 +1,84 @@
+import { getToken, clearToken } from './authAPI';
+
 const API_URL = import.meta.env.PROD ? '/api' : 'http://localhost:3001/api';
+
+const authHeaders = () => ({
+  'Content-Type': 'application/json',
+  ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {})
+});
+
+const handleResponse = async (res: Response) => {
+  if (res.status === 401) {
+    clearToken();
+    window.location.href = '/login';
+    throw new Error('Session expired');
+  }
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || `Request failed: ${res.status}`);
+  }
+  return res;
+};
 
 export const betsAPI = {
   getAll: async () => {
-    const response = await fetch(`${API_URL}/bets`);
-    if (!response.ok) throw new Error('Failed to fetch bets');
-    return response.json();
+    const res = await fetch(`${API_URL}/bets`, { headers: authHeaders() });
+    await handleResponse(res);
+    return res.json();
   },
 
   create: async (bet) => {
-    const response = await fetch(`${API_URL}/bets`, {
+    const res = await fetch(`${API_URL}/bets`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders(),
       body: JSON.stringify(bet)
     });
-    if (!response.ok) throw new Error('Failed to create bet');
-    return response.json();
+    await handleResponse(res);
+    return res.json();
   },
 
   update: async (id, updates) => {
-    const response = await fetch(`${API_URL}/bets/${id}`, {
+    const res = await fetch(`${API_URL}/bets/${id}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders(),
       body: JSON.stringify(updates)
     });
-    if (!response.ok) throw new Error('Failed to update bet');
-    return response.json();
+    await handleResponse(res);
+    return res.json();
   },
 
   delete: async (id) => {
-    const response = await fetch(`${API_URL}/bets/${id}`, {
-      method: 'DELETE'
+    const res = await fetch(`${API_URL}/bets/${id}`, {
+      method: 'DELETE',
+      headers: authHeaders()
     });
-    if (!response.ok) throw new Error('Failed to delete bet');
+    await handleResponse(res);
   },
 
   clearAll: async () => {
-    const response = await fetch(`${API_URL}/bets`, {
-      method: 'DELETE'
+    const res = await fetch(`${API_URL}/bets`, {
+      method: 'DELETE',
+      headers: authHeaders()
     });
-    if (!response.ok) throw new Error('Failed to clear bets');
+    await handleResponse(res);
   }
 };
 
 export const settingsAPI = {
   get: async () => {
-    const response = await fetch(`${API_URL}/settings`);
-    if (!response.ok) throw new Error('Failed to fetch settings');
-    return response.json();
+    const res = await fetch(`${API_URL}/settings`, { headers: authHeaders() });
+    await handleResponse(res);
+    return res.json();
   },
 
   update: async (settings) => {
-    const response = await fetch(`${API_URL}/settings`, {
+    const res = await fetch(`${API_URL}/settings`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders(),
       body: JSON.stringify(settings)
     });
-    if (!response.ok) throw new Error('Failed to update settings');
-    return response.json();
+    await handleResponse(res);
+    return res.json();
   }
 };
+

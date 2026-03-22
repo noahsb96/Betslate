@@ -47,8 +47,7 @@ export interface AppSettings {
   recapEmbedColor: number;
 }
 
-export interface UserAccount {
-  username: string;
-  passwordHash: string;
-  settings: AppSettings;
+export interface User {
+  id: string;
+  email: string;
 }

@@ -1,13 +1,20 @@
 
 import React, { useState, useEffect } from 'react';
-import { Settings, RefreshCw, Trash, Plus, Calendar, Clock, Layers, FileText, X } from 'lucide-react';
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { Settings, RefreshCw, Trash, Plus, Calendar, Clock, Layers, FileText, X, LogOut } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import Uploader from './components/Uploader';
 import BetCard from './components/BetCard';
 import StatsOverview from './components/StatsOverview';
+import LoginPage from './components/auth/LoginPage';
+import SignupPage from './components/auth/SignupPage';
+import ForgotPasswordPage from './components/auth/ForgotPasswordPage';
+import ResetPasswordPage from './components/auth/ResetPasswordPage';
+import VerifyEmailPage from './components/auth/VerifyEmailPage';
 import { analyzeSlateImage } from './services/geminiService';
 import { betsAPI, settingsAPI } from './services/api';
-import { Bet, BetResult, AppSettings } from './types';
+import { authAPI, getToken, clearToken } from './services/authAPI';
+import { Bet, BetResult, AppSettings, User } from './types';
 
 const DEFAULT_SETTINGS: AppSettings = {
     mentionString: '@Chefs Plays',
@@ -52,7 +59,7 @@ CRITICAL RULES:
    - **DEFAULT**: If the league cannot be determined or doesn't match one of the 4 allowed leagues, use "TT Elite Series".`
 };
 
-const App: React.FC = () => {
+const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogout }) => {
   const [apiKey, setApiKey] = useState<string>('');
   const [bets, setBets] = useState<Bet[]>([]);
   const [loading, setLoading] = useState(false);
@@ -390,12 +397,20 @@ const App: React.FC = () => {
             </div>
           </div>
           <div className="flex items-center space-x-2">
+            <span className="text-xs text-gray-500 hidden sm:block">{user.email}</span>
             <button 
                 onClick={() => setShowSettings(!showSettings)}
                 className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-full transition-colors"
                 title="Settings"
             >
                 <Settings size={20} />
+            </button>
+            <button
+                onClick={onLogout}
+                className="p-2 text-gray-400 hover:text-red-400 hover:bg-gray-700 rounded-full transition-colors"
+                title="Sign out"
+            >
+                <LogOut size={20} />
             </button>
           </div>
         </div>
@@ -685,6 +700,66 @@ const App: React.FC = () => {
 
       </main>
     </div>
+  );
+};
+
+const App: React.FC = () => {
+  const [user, setUser] = useState<User | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    const token = getToken();
+    if (!token) {
+      setAuthChecked(true);
+      return;
+    }
+    authAPI.me()
+      .then(u => {
+        setUser(u);
+        setAuthChecked(true);
+      })
+      .catch(() => {
+        clearToken();
+        setAuthChecked(true);
+      });
+  }, []);
+
+  const handleLogin = (u: User) => {
+    setUser(u);
+  };
+
+  const handleLogout = () => {
+    clearToken();
+    setUser(null);
+    navigate('/login');
+  };
+
+  if (!authChecked) {
+    return (
+      <div className="min-h-screen bg-[#36393f] flex items-center justify-center">
+        <div className="text-gray-400 text-sm animate-pulse">Loading...</div>
+      </div>
+    );
+  }
+
+  return (
+    <Routes>
+      <Route path="/login" element={user ? <Navigate to="/" replace /> : <LoginPage onLogin={handleLogin} />} />
+      <Route path="/signup" element={user ? <Navigate to="/" replace /> : <SignupPage />} />
+      <Route path="/forgot-password" element={user ? <Navigate to="/" replace /> : <ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
+      <Route path="/verify-email" element={<VerifyEmailPage />} />
+      <Route
+        path="/*"
+        element={
+          user
+            ? <MainApp user={user} onLogout={handleLogout} />
+            : <Navigate to="/login" state={{ from: location }} replace />
+        }
+      />
+    </Routes>
   );
 };
 
