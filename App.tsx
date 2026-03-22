@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
-import { Settings, RefreshCw, Trash, Plus, Calendar, Clock, Layers, FileText, X, LogOut } from 'lucide-react';
+import { Settings, RefreshCw, Trash, Plus, Calendar, Clock, Layers, FileText, X, LogOut, UserCircle } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import Uploader from './components/Uploader';
 import BetCard from './components/BetCard';
@@ -11,6 +11,8 @@ import SignupPage from './components/auth/SignupPage';
 import ForgotPasswordPage from './components/auth/ForgotPasswordPage';
 import ResetPasswordPage from './components/auth/ResetPasswordPage';
 import VerifyEmailPage from './components/auth/VerifyEmailPage';
+import AccountPage from './components/auth/AccountPage';
+import ConfirmEmailChangePage from './components/auth/ConfirmEmailChangePage';
 import { analyzeSlateImage } from './services/geminiService';
 import { betsAPI, settingsAPI } from './services/api';
 import { authAPI, getToken, clearToken } from './services/authAPI';
@@ -60,6 +62,7 @@ CRITICAL RULES:
 };
 
 const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogout }) => {
+  const navigate = useNavigate();
   const [apiKey, setApiKey] = useState<string>('');
   const [bets, setBets] = useState<Bet[]>([]);
   const [loading, setLoading] = useState(false);
@@ -404,6 +407,13 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
                 title="Settings"
             >
                 <Settings size={20} />
+            </button>
+            <button
+                onClick={() => navigate('/account')}
+                className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-full transition-colors"
+                title="Account settings"
+            >
+                <UserCircle size={20} />
             </button>
             <button
                 onClick={onLogout}
@@ -751,6 +761,8 @@ const App: React.FC = () => {
       <Route path="/forgot-password" element={user ? <Navigate to="/" replace /> : <ForgotPasswordPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/verify-email" element={<VerifyEmailPage />} />
+      <Route path="/confirm-email-change" element={<ConfirmEmailChangePage />} />
+      <Route path="/account" element={user ? <AccountPage user={user} onLogout={handleLogout} /> : <Navigate to="/login" replace />} />
       <Route
         path="/*"
         element={

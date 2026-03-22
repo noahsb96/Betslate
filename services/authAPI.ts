@@ -81,5 +81,34 @@ export const authAPI = {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Verification failed');
     return data;
+  },
+
+  changePassword: async (currentPassword: string, newPassword: string): Promise<{ message: string }> => {
+    const res = await fetch(`${API_URL}/auth/change-password`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ currentPassword, newPassword })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to change password');
+    return data;
+  },
+
+  changeEmail: async (currentPassword: string, newEmail: string): Promise<{ message: string }> => {
+    const res = await fetch(`${API_URL}/auth/change-email`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ currentPassword, newEmail })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to change email');
+    return data;
+  },
+
+  confirmEmailChange: async (token: string): Promise<{ message: string }> => {
+    const res = await fetch(`${API_URL}/auth/confirm-email-change?token=${encodeURIComponent(token)}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Confirmation failed');
+    return data;
   }
 };

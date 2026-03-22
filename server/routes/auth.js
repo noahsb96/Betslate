@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import rateLimit from 'express-rate-limit';
 import pool from '../database.js';
-import { sendVerificationEmail, sendPasswordResetEmail } from '../services/emailService.js';
+import { sendVerificationEmail, sendPasswordResetEmail, sendPasswordChangedEmail, sendEmailChangeConfirmation } from '../services/emailService.js';
 import { requireAuth } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -13,7 +13,7 @@ const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10,
+  max: 30,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many attempts, please try again later.' }
@@ -227,6 +227,136 @@ router.post('/reset-password', async (req, res) => {
 // GET /api/auth/me
 router.get('/me', requireAuth, (req, res) => {
   res.json({ id: req.user.id, email: req.user.email });
+});
+
+// POST /api/auth/change-password  (protected)
+router.post('/change-password', requireAuth, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'Current and new passwords are required.' });
+    }
+
+    if (!PASSWORD_REGEX.test(newPassword)) {
+      return res.status(400).json({
+        error: 'New password must be at least 8 characters and include an uppercase letter, lowercase letter, number, and special character.'
+      });
+    }
+
+    const result = await pool.query('SELECT * FROM users WHERE id = $1', [req.user.id]);
+    const user = result.rows[0];
+
+    const passwordMatch = await bcrypt.compare(currentPassword, user.password_hash);
+    if (!passwordMatch) {
+      return res.status(401).json({ error: 'Current password is incorrect.' });
+    }
+
+    const samePassword = await bcrypt.compare(newPassword, user.password_hash);
+    if (samePassword) {
+      return res.status(400).json({ error: 'New password must be different from your current password.' });
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [passwordHash, req.user.id]);
+
+    await sendPasswordChangedEmail(user.email);
+
+    res.json({ message: 'Password updated successfully.' });
+  } catch (err) {
+    console.error('Change password error:', err);
+    res.status(500).json({ error: 'Failed to change password. Please try again.' });
+  }
+});
+
+// POST /api/auth/change-email  (protected)
+router.post('/change-email', authLimiter, requireAuth, async (req, res) => {
+  try {
+    const { currentPassword, newEmail } = req.body;
+
+    if (!currentPassword || !newEmail) {
+      return res.status(400).json({ error: 'Current password and new email are required.' });
+    }
+
+    const normalizedEmail = newEmail.trim().toLowerCase();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(normalizedEmail)) {
+      return res.status(400).json({ error: 'Invalid email address.' });
+    }
+
+    const result = await pool.query('SELECT * FROM users WHERE id = $1', [req.user.id]);
+    const user = result.rows[0];
+
+    const passwordMatch = await bcrypt.compare(currentPassword, user.password_hash);
+    if (!passwordMatch) {
+      return res.status(401).json({ error: 'Current password is incorrect.' });
+    }
+
+    if (normalizedEmail === user.email) {
+      return res.status(400).json({ error: 'New email is the same as your current email.' });
+    }
+
+    const existing = await pool.query('SELECT id FROM users WHERE email = $1', [normalizedEmail]);
+    if (existing.rows.length > 0) {
+      return res.status(409).json({ error: 'An account with this email already exists.' });
+    }
+
+    // Delete any pending change token for this user then create a fresh one
+    await pool.query('DELETE FROM email_change_tokens WHERE user_id = $1', [req.user.id]);
+    const token = crypto.randomBytes(32).toString('hex');
+    const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    await pool.query(
+      'INSERT INTO email_change_tokens (token, user_id, new_email, expires_at) VALUES ($1, $2, $3, $4)',
+      [token, req.user.id, normalizedEmail, expires]
+    );
+
+    await sendEmailChangeConfirmation(normalizedEmail, token);
+
+    res.json({ message: `A confirmation link has been sent to ${normalizedEmail}. Click it to complete the change.` });
+  } catch (err) {
+    console.error('Change email error:', err);
+    res.status(500).json({ error: 'Failed to initiate email change. Please try again.' });
+  }
+});
+
+// GET /api/auth/confirm-email-change?token=...
+router.get('/confirm-email-change', async (req, res) => {
+  try {
+    const { token } = req.query;
+    if (!token) {
+      return res.status(400).json({ error: 'Confirmation token is required.' });
+    }
+
+    const result = await pool.query(
+      'SELECT * FROM email_change_tokens WHERE token = $1',
+      [token]
+    );
+    const row = result.rows[0];
+
+    if (!row) {
+      return res.status(400).json({ error: 'Invalid or already used confirmation link.' });
+    }
+
+    if (new Date(row.expires_at) < new Date()) {
+      await pool.query('DELETE FROM email_change_tokens WHERE token = $1', [token]);
+      return res.status(400).json({ error: 'Confirmation link has expired. Please request a new email change.' });
+    }
+
+    // Ensure the new email hasn't been taken by someone else in the meantime
+    const existing = await pool.query('SELECT id FROM users WHERE email = $1', [row.new_email]);
+    if (existing.rows.length > 0) {
+      await pool.query('DELETE FROM email_change_tokens WHERE token = $1', [token]);
+      return res.status(409).json({ error: 'This email address is already in use by another account.' });
+    }
+
+    await pool.query('UPDATE users SET email = $1 WHERE id = $2', [row.new_email, row.user_id]);
+    await pool.query('DELETE FROM email_change_tokens WHERE token = $1', [token]);
+
+    res.json({ message: 'Email address updated successfully. Please log in again.' });
+  } catch (err) {
+    console.error('Confirm email change error:', err);
+    res.status(500).json({ error: 'Confirmation failed. Please try again.' });
+  }
 });
 
 export default router;
