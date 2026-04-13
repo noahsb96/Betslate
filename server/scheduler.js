@@ -1,5 +1,9 @@
 import db from './database.js';
 
+let rateLimitedUntil = 0;
+
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
 const postToDiscord = async (bet, settings) => {
   if (!settings.discordWebhookUrl) return false;
 
@@ -43,6 +47,14 @@ const postToDiscord = async (bet, settings) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
+    if (response.status === 429) {
+      const retryAfter = response.headers.get('Retry-After');
+      const waitMs = retryAfter ? parseFloat(retryAfter) * 1000 : 60000;
+      rateLimitedUntil = Date.now() + waitMs;
+      const body = await response.text();
+      console.error(`Discord Webhook Error: HTTP 429 — rate limited for ${Math.ceil(waitMs / 1000)}s. Body: ${body.substring(0, 200)}`);
+      return false;
+    }
     if (!response.ok) {
       const body = await response.text();
       console.error(`Discord Webhook Error: HTTP ${response.status} ${response.statusText} — ${body}`);
@@ -68,6 +80,12 @@ export const startScheduler = () => {
       `).all();
       
       for (const bet of bets) {
+        if (Date.now() < rateLimitedUntil) {
+          const waitSec = Math.ceil((rateLimitedUntil - Date.now()) / 1000);
+          console.log(`⏳ Rate limited — skipping posts for ${waitSec}s more`);
+          break;
+        }
+
         const postTime = bet.customScheduleTime 
           ? bet.customScheduleTime 
           : (bet.matchTimestamp ? bet.matchTimestamp - (settings.scheduleOffsetMinutes * 60 * 1000) : null);
@@ -89,6 +107,8 @@ export const startScheduler = () => {
             if (success) {
               db.prepare('UPDATE bets SET isPosted = 1, autoPost = 0 WHERE id = ?').run(bet.id);
               console.log(`✅ Successfully posted: ${bet.playerA} vs ${bet.playerB}`);
+              // Respect Discord's rate limit: wait 2s between posts
+              await sleep(2000);
             } else {
               console.log(`❌ Failed to post: ${bet.playerA} vs ${bet.playerB}`);
             }
