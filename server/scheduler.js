@@ -43,7 +43,12 @@ const postToDiscord = async (bet, settings) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
-    return response.ok;
+    if (!response.ok) {
+      const body = await response.text();
+      console.error(`Discord Webhook Error: HTTP ${response.status} ${response.statusText} — ${body}`);
+      return false;
+    }
+    return true;
   } catch (e) {
     console.error("Discord Webhook Error:", e);
     return false;
