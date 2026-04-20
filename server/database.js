@@ -36,8 +36,37 @@ export const initDatabase = async () => {
       "customScheduleTime" BIGINT,
       "autoPost" BOOLEAN DEFAULT false,
       "isPosted" BOOLEAN DEFAULT false,
-      "customTitle" TEXT
+      "customTitle" TEXT,
+      "slateDate" TEXT
     )
+  `);
+
+  await pool.query(`
+    ALTER TABLE bets ADD COLUMN IF NOT EXISTS "slateDate" TEXT
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_bets_user_slate ON bets (user_id, "slateDate")
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS daily_recaps (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      date TEXT NOT NULL,
+      wins INTEGER NOT NULL DEFAULT 0,
+      losses INTEGER NOT NULL DEFAULT 0,
+      pushes INTEGER NOT NULL DEFAULT 0,
+      net_units REAL NOT NULL DEFAULT 0,
+      roi REAL NOT NULL DEFAULT 0,
+      league_breakdown JSONB NOT NULL DEFAULT '[]',
+      created_at TIMESTAMPTZ DEFAULT now(),
+      UNIQUE (user_id, date)
+    )
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_daily_recaps_user_date ON daily_recaps (user_id, date)
   `);
 
   await pool.query(`

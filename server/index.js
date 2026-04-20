@@ -7,6 +7,7 @@ import { dirname, join } from 'path';
 import betsRouter from './routes/bets.js';
 import settingsRouter from './routes/settings.js';
 import authRouter from './routes/auth.js';
+import recapsRouter from './routes/recaps.js';
 import { initDatabase } from './database.js';
 import { startScheduler } from './scheduler.js';
 import { requireAuth } from './middleware/auth.js';
@@ -49,6 +50,7 @@ await initDatabase();
 app.use('/api/auth', authRouter);
 app.use('/api/bets', requireAuth, betsRouter);
 app.use('/api/settings', requireAuth, settingsRouter);
+app.use('/api/recaps', requireAuth, recapsRouter);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

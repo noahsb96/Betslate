@@ -18,7 +18,7 @@ export interface Bet {
   result: BetResult;
   notes?: string;
   timestamp: number;
-  
+  slateDate?: string;
   matchTimestamp?: number;
   customScheduleTime?: number;
   autoPost: boolean;
@@ -50,4 +50,49 @@ export interface AppSettings {
 export interface User {
   id: string;
   email: string;
+}
+
+export interface DailyRecap {
+  id?: string;
+  user_id?: string;
+  date: string;
+  wins: number;
+  losses: number;
+  pushes: number;
+  net_units: number;
+  roi: number;
+  league_breakdown: Array<{ league: string; units: number }>;
+  created_at?: string;
+}
+
+export interface MonthlyRecap {
+  period: string;
+  wins: number;
+  losses: number;
+  pushes: number;
+  net_units: number;
+  roi: number;
+  total_bets: number;
+  league_breakdown: Array<{ league: string; units: number }>;
+  days: DailyRecap[];
+}
+
+export interface YearlyRecap {
+  year: number;
+  wins: number;
+  losses: number;
+  pushes: number;
+  net_units: number;
+  total_bets: number;
+  league_breakdown: Array<{ league: string; units: number }>;
+  months: Array<{
+    month: string;
+    wins: number;
+    losses: number;
+    pushes: number;
+    net_units: number;
+    total_bets: number;
+    days_with_recaps: number;
+    league_breakdown: Array<{ league: string; units: number }>;
+  }>;
 }

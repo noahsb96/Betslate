@@ -6,7 +6,7 @@ const router = express.Router();
 const ALLOWED_UPDATE_FIELDS = new Set([
   'league', 'playerA', 'playerB', 'time', 'type', 'units', 'odds', 'result',
   'notes', 'timestamp', 'matchTimestamp', 'customScheduleTime', 'autoPost',
-  'isPosted', 'customTitle'
+  'isPosted', 'customTitle', 'slateDate'
 ]);
 
 router.get('/', async (req, res) => {
@@ -27,13 +27,14 @@ router.post('/', async (req, res) => {
     await pool.query(
       `INSERT INTO bets (
         id, user_id, league, "playerA", "playerB", time, type, units, odds, result, notes,
-        timestamp, "matchTimestamp", "customScheduleTime", "autoPost", "isPosted", "customTitle"
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
+        timestamp, "matchTimestamp", "customScheduleTime", "autoPost", "isPosted", "customTitle", "slateDate"
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
       [
         bet.id, req.user.id, bet.league, bet.playerA, bet.playerB, bet.time, bet.type,
         bet.units, bet.odds || null, bet.result, bet.notes || null,
         bet.timestamp, bet.matchTimestamp || null, bet.customScheduleTime || null,
-        bet.autoPost ?? false, bet.isPosted ?? false, bet.customTitle || null
+        bet.autoPost ?? false, bet.isPosted ?? false, bet.customTitle || null,
+        bet.slateDate || null
       ]
     );
     res.status(201).json(bet);
@@ -88,7 +89,12 @@ router.delete('/:id', async (req, res) => {
 
 router.delete('/', async (req, res) => {
   try {
-    await pool.query('DELETE FROM bets WHERE user_id = $1', [req.user.id]);
+    const { slateDate } = req.query;
+    if (slateDate) {
+      await pool.query('DELETE FROM bets WHERE user_id = $1 AND "slateDate" = $2', [req.user.id, slateDate]);
+    } else {
+      await pool.query('DELETE FROM bets WHERE user_id = $1', [req.user.id]);
+    }
     res.status(204).send();
   } catch (error) {
     res.status(500).json({ error: error.message });

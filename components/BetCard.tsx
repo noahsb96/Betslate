@@ -10,9 +10,10 @@ interface BetCardProps {
   onDelete: (id: string) => void;
   onCopy: (bet: Bet) => void;
   onPostToDiscord: (bet: Bet) => Promise<boolean>;
+  readOnly?: boolean;
 }
 
-const BetCard: React.FC<BetCardProps> = ({ bet, settings, onUpdate, onDelete, onCopy, onPostToDiscord }) => {
+const BetCard: React.FC<BetCardProps> = ({ bet, settings, onUpdate, onDelete, onCopy, onPostToDiscord, readOnly = false }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState(bet);
   const [isPosting, setIsPosting] = useState(false);
@@ -157,7 +158,7 @@ const BetCard: React.FC<BetCardProps> = ({ bet, settings, onUpdate, onDelete, on
         
         <div className="flex items-center gap-0.5 sm:gap-1 md:gap-2 flex-shrink-0">
           
-          {!bet.isPosted && (
+          {!readOnly && !bet.isPosted && (
              <div className="flex items-center gap-0.5 sm:gap-1 bg-[#202225] rounded p-0.5 md:p-1">
                <button 
                  onClick={toggleAutoSchedule}
@@ -244,15 +245,16 @@ const BetCard: React.FC<BetCardProps> = ({ bet, settings, onUpdate, onDelete, on
              </span>
           )}
 
-          {isEditing ? (
+          {!readOnly && isEditing ? (
              <button onClick={handleSave} className="p-1 sm:p-1.5 text-green-400 hover:bg-gray-700 rounded"><Save size={14}/></button>
-          ) : (
+          ) : !readOnly ? (
              <button onClick={() => {
                setEditForm(bet);
                setIsEditing(true);
              }} className="p-1 sm:p-1.5 text-gray-400 hover:text-white hover:bg-gray-700 rounded"><Edit2 size={14}/></button>
-          )}
+          ) : null}
           
+          {!readOnly && (
           <button 
             onClick={() => onCopy(bet)}
             className="p-1 sm:p-1.5 text-purple-400 hover:text-white hover:bg-gray-700 rounded"
@@ -260,7 +262,9 @@ const BetCard: React.FC<BetCardProps> = ({ bet, settings, onUpdate, onDelete, on
           >
             <Copy size={14}/>
           </button>
+          )}
           
+          {!readOnly && (
           <button 
             onClick={handlePost} 
             disabled={isPosting || bet.isPosted}
@@ -269,10 +273,13 @@ const BetCard: React.FC<BetCardProps> = ({ bet, settings, onUpdate, onDelete, on
           >
              {isPosting ? <Loader2 size={14} className="animate-spin" /> : <Send size={14}/>}
           </button>
+          )}
 
+          {!readOnly && (
           <button onClick={handleDelete} className="p-1 sm:p-1.5 text-red-400 hover:bg-gray-700 rounded z-10">
             <Trash2 size={14}/>
           </button>
+          )}
         </div>
       </div>
 
@@ -357,7 +364,7 @@ const BetCard: React.FC<BetCardProps> = ({ bet, settings, onUpdate, onDelete, on
           )}
         </div>
 
-        {bet.isPosted && (
+        {!readOnly && bet.isPosted && (
           <div className="flex items-center space-x-2 mt-3 animate-fade-in flex-wrap gap-y-2">
             <button 
               onClick={() => onUpdate(bet.id, { result: BetResult.WIN })}

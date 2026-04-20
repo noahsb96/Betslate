@@ -1,11 +1,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
-import { Settings, RefreshCw, Trash, Plus, Calendar, Clock, Layers, FileText, X, LogOut, UserCircle } from 'lucide-react';
+import { Settings, RefreshCw, Trash, Plus, Calendar, Clock, Layers, FileText, X, LogOut, UserCircle, RotateCcw } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import Uploader from './components/Uploader';
 import BetCard from './components/BetCard';
 import StatsOverview from './components/StatsOverview';
+import CalendarView from './components/Calendar';
 import LoginPage from './components/auth/LoginPage';
 import SignupPage from './components/auth/SignupPage';
 import ForgotPasswordPage from './components/auth/ForgotPasswordPage';
@@ -68,8 +69,9 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
   const [loading, setLoading] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'queue' | 'history'>('queue');
+  const [activeTab, setActiveTab] = useState<'queue' | 'history' | 'calendar'>('queue');
   const [slateDate, setSlateDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [restoredDate, setRestoredDate] = useState<string | null>(null);
   const [appSettings, setAppSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [scrollToBetId, setScrollToBetId] = useState<string | null>(null);
 
@@ -202,6 +204,7 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
         const newBetsRaw = await analyzeSlateImage(base64, apiKey, appSettings.aiInstructions);
         const processedBets = newBetsRaw.map(b => ({
             ...b,
+            slateDate,
             matchTimestamp: parseMatchTime(b.time, slateDate, appSettings.slateTimezone),
             autoPost: false,
             isPosted: false
@@ -246,9 +249,9 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
   };
 
   const clearAllBets = async () => {
-    if (window.confirm("Clear all bets? This cannot be undone.")) {
-      await betsAPI.clearAll();
-      setBets([]);
+    if (window.confirm(`Clear all bets for ${slateDate}? This cannot be undone.`)) {
+      await betsAPI.clearAll(slateDate);
+      setBets(prev => prev.filter(b => b.slateDate !== slateDate));
     }
   };
   
@@ -263,6 +266,7 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
          units: 1,
          result: BetResult.PENDING,
          timestamp: Date.now(),
+         slateDate,
          autoPost: false,
          isPosted: false,
          matchTimestamp: parseMatchTime('12:00 PM', slateDate, appSettings.slateTimezone)
@@ -282,6 +286,7 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
          units: 1,
          result: BetResult.PENDING,
          timestamp: Date.now(),
+         slateDate,
          autoPost: false,
          isPosted: true,
          matchTimestamp: parseMatchTime('12:00 PM', slateDate, appSettings.slateTimezone)
@@ -385,7 +390,7 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
     const timeB = b.customScheduleTime || (b.matchTimestamp ? b.matchTimestamp - (appSettings.scheduleOffsetMinutes * 60000) : 0);
     return timeA - timeB;
   });
-  const historyBets = bets.filter(b => b.isPosted);
+  const historyBets = bets.filter(b => b.isPosted && b.slateDate === slateDate);
 
   return (
     <div className="min-h-screen bg-[#36393f] font-sans text-gray-100 pb-20">
@@ -612,6 +617,12 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
           >
             <FileText size={16} className="mr-1 md:mr-2"/> History & Stats ({historyBets.length})
           </button>
+          <button
+            onClick={() => setActiveTab('calendar')}
+            className={`flex items-center px-3 md:px-4 py-2 font-medium transition-all rounded-t-lg whitespace-nowrap ${activeTab === 'calendar' ? 'bg-[#2f3136] text-white border-t border-l border-r border-gray-600' : 'text-gray-400 hover:text-white hover:bg-[#2f3136]/50'}`}
+          >
+            <Calendar size={16} className="mr-1 md:mr-2"/> Calendar
+          </button>
         </div>
 
         {activeTab === 'queue' && (
@@ -675,21 +686,48 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
 
         {activeTab === 'history' && (
           <>
-            <StatsOverview bets={bets} settings={appSettings} onUpdateSettings={setAppSettings} onDeleteBet={handleDeleteBet} />
+            {restoredDate && (
+              <div className="flex items-center justify-between mb-4 px-4 py-2 bg-indigo-900/30 border border-indigo-600 rounded-lg text-sm">
+                <span className="text-indigo-300 flex items-center gap-2">
+                  <RotateCcw size={14} />
+                  Viewing restored data for <strong>{restoredDate}</strong>
+                </span>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setActiveTab('calendar')}
+                    className="text-indigo-400 hover:text-indigo-200 underline"
+                  >
+                    Back to Calendar
+                  </button>
+                  <button
+                    onClick={() => {
+                      setRestoredDate(null);
+                      setSlateDate(new Date().toISOString().split('T')[0]);
+                    }}
+                    className="text-gray-400 hover:text-white underline"
+                  >
+                    Cancel Restore
+                  </button>
+                </div>
+              </div>
+            )}
+            <StatsOverview bets={bets} settings={appSettings} slateDate={slateDate} onUpdateSettings={setAppSettings} onDeleteBet={handleDeleteBet} />
             
             <div className="flex justify-between items-center mb-4">
                <button onClick={handleManualAddPosted} className="flex items-center text-sm px-3 py-2 bg-[#2f3136] hover:bg-[#40444b] rounded-lg border border-gray-700 transition-colors">
                   <Plus size={16} className="mr-1 text-green-400"/> Add Manual Play
                </button>
-               <button onClick={clearAllBets} className="flex items-center text-xs text-red-400 hover:text-red-200">
-                  <RefreshCw size={12} className="mr-1"/> Reset All Data
-               </button>
+               {!restoredDate && (
+                 <button onClick={clearAllBets} className="flex items-center text-xs text-red-400 hover:text-red-200">
+                   <RefreshCw size={12} className="mr-1"/> Reset All Data
+                 </button>
+               )}
             </div>
 
             <div className="space-y-2">
               {historyBets.length === 0 ? (
                  <div className="text-center py-12 text-gray-500">
-                    No posted bets yet.
+                    No posted bets for {slateDate}.
                  </div>
               ) : (
                 historyBets.map(bet => (
@@ -706,6 +744,19 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
               )}
             </div>
           </>
+        )}
+
+        {activeTab === 'calendar' && (
+          <div className="bg-[#2f3136] rounded-lg p-4 md:p-6 shadow-lg">
+            <CalendarView
+              settings={appSettings}
+              onRestoreDate={(date) => {
+                setSlateDate(date);
+                setRestoredDate(date);
+                setActiveTab('history');
+              }}
+            />
+          </div>
         )}
 
       </main>

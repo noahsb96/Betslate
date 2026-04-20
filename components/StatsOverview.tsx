@@ -3,21 +3,33 @@ import React, { useState, useEffect } from 'react';
 import { Bet, BetResult, AppSettings } from '../types';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { Send, Clock, CheckCircle, ChevronDown, ChevronUp, Eye } from 'lucide-react';
+import { recapsAPI } from '../services/api';
 
 interface StatsOverviewProps {
   bets: Bet[];
   settings: AppSettings;
+  slateDate: string;
   onUpdateSettings: (s: AppSettings) => void;
   onDeleteBet: (id: string) => void;
 }
 
-const StatsOverview: React.FC<StatsOverviewProps> = ({ bets, settings, onUpdateSettings, onDeleteBet }) => {
+const StatsOverview: React.FC<StatsOverviewProps> = ({ bets, settings, slateDate, onUpdateSettings, onDeleteBet }) => {
   const [recapTime, setRecapTime] = useState<string>('');
   const [recapScheduled, setRecapScheduled] = useState(false);
   const [showRecapSettings, setShowRecapSettings] = useState(false);
   const [showRecapPreview, setShowRecapPreview] = useState(false);
+  // Editable recap date — defaults to slateDate but user can change it before sending
+  const [recapDate, setRecapDate] = useState<string>(slateDate);
 
-  const finishedBets = bets.filter(b => b.result !== BetResult.PENDING);
+  // Keep recapDate in sync when the slate date picker changes
+  useEffect(() => { setRecapDate(slateDate); }, [slateDate]);
+
+  // Filter to bets for the current slate date only
+  const dateBets = slateDate
+    ? bets.filter(b => b.slateDate === slateDate)
+    : bets;
+
+  const finishedBets = dateBets.filter(b => b.result !== BetResult.PENDING);
   
   const wins = finishedBets.filter(b => b.result === BetResult.WIN).length;
   const losses = finishedBets.filter(b => b.result === BetResult.LOSS).length;
@@ -100,7 +112,9 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({ bets, settings, onUpdateS
       fields.push({ name: "League Breakdown", value: leagueStatsText, inline: false });
     }
     
-    const titleDate = settings.recapIncludeDate ? ` - ${new Date().toLocaleDateString()}` : '';
+    const titleDate = settings.recapIncludeDate
+      ? ` - ${recapDate ? new Date(recapDate + 'T12:00:00').toLocaleDateString() : new Date().toLocaleDateString()}`
+      : '';
     
     return {
       title: `${settings.recapTitle || 'Daily Recap'}${titleDate}`,
@@ -118,11 +132,10 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({ bets, settings, onUpdateS
       return;
     }
 
-    const pendingBets = bets.filter(b => b.result === BetResult.PENDING && b.isPosted);
-    const finishedPostedBets = bets.filter(b => b.result !== BetResult.PENDING && b.isPosted);
+    const pendingBets = dateBets.filter(b => b.result === BetResult.PENDING && b.isPosted);
     
     if (pendingBets.length > 0) {
-      const confirmMessage = `There are ${pendingBets.length} pending play(s) that haven't been marked yet.\n\nDo you want to continue? Finished plays will be deleted, but pending plays will remain.`;
+      const confirmMessage = `There are ${pendingBets.length} pending play(s) that haven't been marked yet.\n\nDo you want to continue?`;
       if (!window.confirm(confirmMessage)) {
         return;
       }
@@ -140,14 +153,32 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({ bets, settings, onUpdateS
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(payload)
         });
-        
-        for (const bet of finishedPostedBets) {
-          onDeleteBet(bet.id);
+
+        // Save the recap snapshot to DB for calendar history
+        if (recapDate) {
+          const roi = finishedBets.length > 0
+            ? parseFloat(((netUnits / finishedBets.reduce((a, b) => a + b.units, 0)) * 100).toFixed(1))
+            : 0;
+          const leagueBD = Object.entries(leagueStats).map(([league, units]) => ({
+            league,
+            units: parseFloat((units as number).toFixed(2))
+          }));
+          try {
+            await recapsAPI.saveDaily({
+              date: recapDate,
+              wins,
+              losses,
+              pushes,
+              net_units: parseFloat(formattedNetUnits),
+              roi,
+              league_breakdown: leagueBD
+            });
+          } catch (saveErr) {
+            console.error('Failed to save recap snapshot:', saveErr);
+          }
         }
         
-        alert(pendingBets.length > 0 
-          ? `Recap sent successfully! Deleted ${finishedPostedBets.length} finished play(s). ${pendingBets.length} pending play(s) kept.`
-          : "Recap sent successfully! All plays cleared.");
+        alert("Recap sent and saved to calendar history!");
     } catch(e) {
         console.error(e);
         alert("Failed to send recap.");
@@ -164,8 +195,27 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({ bets, settings, onUpdateS
          <h3 className="text-sm font-bold text-gray-300 mb-3 uppercase tracking-wide flex items-center">
             <Clock size={14} className="mr-2"/> Automated Recap
          </h3>
-         <div className="flex flex-col md:flex-row items-center gap-4">
-             <div className="flex items-center space-x-2">
+         <div className="flex flex-col gap-3">
+             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 flex-wrap">
+               <div className="flex items-center space-x-2">
+                 <label className="text-xs text-gray-400 whitespace-nowrap">Recap Date</label>
+                 <input
+                   type="date"
+                   value={recapDate}
+                   onChange={(e) => setRecapDate(e.target.value)}
+                   className="bg-[#2f3136] border border-gray-600 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-indigo-500"
+                 />
+                 {recapDate !== slateDate && (
+                   <button
+                     onClick={() => setRecapDate(slateDate)}
+                     className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
+                     title="Reset to slate date"
+                   >
+                     Reset
+                   </button>
+                 )}
+               </div>
+               <div className="flex items-center space-x-2">
                  <input 
                    type="time" 
                    value={recapTime} 
@@ -178,13 +228,18 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({ bets, settings, onUpdateS
                  >
                     {recapScheduled ? 'Scheduled' : 'Schedule'}
                  </button>
-             </div>
-
-             <div className="ml-auto">
+               </div>
+               <div className="sm:ml-auto">
                  <button onClick={handleSendRecap} className="flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-sm transition-colors">
                     <Send size={14} className="mr-2"/> Send Recap Now
                  </button>
+               </div>
              </div>
+             {recapDate !== slateDate && (
+               <p className="text-xs text-yellow-400">
+                 ⚠️ Recap will be saved to <strong>{recapDate}</strong> (not today's slate date)
+               </p>
+             )}
          </div>
       </div>
 
