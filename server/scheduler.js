@@ -1,11 +1,24 @@
-import db from './database.js';
+import pool from './database.js';
 
-let rateLimitedUntil = 0;
+// Per-webhook rate-limit tracking (keyed by webhook URL)
+const webhookLastPost = new Map();   // url → timestamp of last successful post
+const webhookRetryAfter = new Map(); // url → timestamp when rate limit expires
 
-const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+const MIN_POST_INTERVAL_MS = 1500; // minimum 1.5s between posts to the same webhook
+
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 const postToDiscord = async (bet, settings) => {
   if (!settings.discordWebhookUrl) return false;
+
+  const url = settings.discordWebhookUrl;
+
+  // Honour Discord retry_after backoff
+  const retryAfter = webhookRetryAfter.get(url);
+  if (retryAfter && Date.now() < retryAfter) {
+    console.log(`⏳ Webhook rate-limited, skipping until ${new Date(retryAfter).toISOString()}`);
+    return false;
+  }
 
   let mentionContent = settings.mentionString || "";
   if (mentionContent && /^\d+$/.test(mentionContent.trim())) {
@@ -42,25 +55,26 @@ const postToDiscord = async (bet, settings) => {
   };
 
   try {
-    const response = await fetch(settings.discordWebhookUrl, {
+    const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
+
     if (response.status === 429) {
-      const retryAfter = response.headers.get('Retry-After');
-      const waitMs = retryAfter ? parseFloat(retryAfter) * 1000 : 60000;
-      rateLimitedUntil = Date.now() + waitMs;
-      const body = await response.text();
-      console.error(`Discord Webhook Error: HTTP 429 — rate limited for ${Math.ceil(waitMs / 1000)}s. Body: ${body.substring(0, 200)}`);
+      let retryMs = 5000;
+      try {
+        const body = await response.json();
+        retryMs = Math.ceil((body.retry_after || 5) * 1000);
+      } catch { /* ignore parse errors */ }
+      webhookRetryAfter.set(url, Date.now() + retryMs);
+      console.warn(`⚠️  Discord rate limit hit for webhook. Retry after ${retryMs}ms`);
       return false;
     }
-    if (!response.ok) {
-      const body = await response.text();
-      console.error(`Discord Webhook Error: HTTP ${response.status} ${response.statusText} — ${body}`);
-      return false;
-    }
-    return true;
+
+    webhookLastPost.set(url, Date.now());
+    webhookRetryAfter.delete(url);
+    return response.ok;
   } catch (e) {
     console.error("Discord Webhook Error:", e);
     return false;
@@ -71,47 +85,57 @@ export const startScheduler = () => {
   setInterval(async () => {
     try {
       const now = Date.now();
-      
-      const settings = db.prepare('SELECT * FROM settings WHERE id = 1').get();
-      
-      const bets = db.prepare(`
-        SELECT * FROM bets 
-        WHERE autoPost = 1 AND isPosted = 0
-      `).all();
-      
-      for (const bet of bets) {
-        if (Date.now() < rateLimitedUntil) {
-          const waitSec = Math.ceil((rateLimitedUntil - Date.now()) / 1000);
-          console.log(`⏳ Rate limited — skipping posts for ${waitSec}s more`);
-          break;
-        }
 
-        const postTime = bet.customScheduleTime 
-          ? bet.customScheduleTime 
-          : (bet.matchTimestamp ? bet.matchTimestamp - (settings.scheduleOffsetMinutes * 60 * 1000) : null);
-        
+      // Join through bot_id so each bot uses its own settings
+      const result = await pool.query(`
+        SELECT b.*, 
+          s."discordWebhookUrl", s."botName", s."botAvatarUrl", s."mentionString",
+          s."scheduleOffsetMinutes", s."slateTimezone", s."defaultOdds",
+          s."defaultBetAlertTitle", s."betEmbedColor"
+        FROM bets b
+        LEFT JOIN settings s ON b.bot_id = s.bot_id
+        WHERE b."autoPost" = true AND b."isPosted" = false
+      `);
+
+      for (const row of result.rows) {
+        const scheduleOffsetMs = (row.scheduleOffsetMinutes || 15) * 60 * 1000;
+        const postTime = row.customScheduleTime
+          ? Number(row.customScheduleTime)
+          : (row.matchTimestamp ? Number(row.matchTimestamp) - scheduleOffsetMs : null);
+
         if (postTime) {
           const timeDiff = now - postTime;
           const fiveMinutesInMs = 5 * 60 * 1000;
-          
+
           if (timeDiff > fiveMinutesInMs) {
-            console.log(`⚠️ Skipping bet scheduled in the past: ${bet.playerA} vs ${bet.playerB} (scheduled ${Math.round(timeDiff / 60000)} mins ago)`);
-            db.prepare('UPDATE bets SET autoPost = 0 WHERE id = ?').run(bet.id);
+            console.log(`⚠️ Skipping bet scheduled in the past: ${row.playerA} vs ${row.playerB}`);
+            await pool.query('UPDATE bets SET "autoPost" = false WHERE id = $1', [row.id]);
             continue;
           }
 
           if (now >= postTime) {
-            console.log(`🔔 Auto-posting bet: ${bet.playerA} vs ${bet.playerB}`);
-            const success = await postToDiscord(bet, settings);
-            
-            if (success) {
-              db.prepare('UPDATE bets SET isPosted = 1, autoPost = 0 WHERE id = ?').run(bet.id);
-              console.log(`✅ Successfully posted: ${bet.playerA} vs ${bet.playerB}`);
-              // Respect Discord's rate limit: wait 2s between posts
-              await sleep(2000);
-            } else {
-              console.log(`❌ Failed to post: ${bet.playerA} vs ${bet.playerB}`);
+            // Enforce minimum inter-post interval per webhook to avoid rate limits
+            const webhookUrl = row.discordWebhookUrl;
+            if (webhookUrl) {
+              const lastPost = webhookLastPost.get(webhookUrl) || 0;
+              if (now - lastPost < MIN_POST_INTERVAL_MS) {
+                // Too soon — skip this tick, will retry on next scheduler run
+                continue;
+              }
             }
+
+            console.log(`🔔 Auto-posting bet: ${row.playerA} vs ${row.playerB}`);
+            const success = await postToDiscord(row, row);
+
+            if (success) {
+              await pool.query('UPDATE bets SET "isPosted" = true, "autoPost" = false WHERE id = $1', [row.id]);
+              console.log(`✅ Successfully posted: ${row.playerA} vs ${row.playerB}`);
+            } else {
+              console.log(`❌ Failed to post: ${row.playerA} vs ${row.playerB}`);
+            }
+
+            // Small delay between consecutive posts in the same scheduler tick
+            await sleep(200);
           }
         }
       }
@@ -120,3 +144,4 @@ export const startScheduler = () => {
     }
   }, 10000);
 };
+
