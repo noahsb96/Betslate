@@ -1,12 +1,19 @@
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+let _resend = null;
+const getResend = () => {
+  if (!_resend) {
+    if (!process.env.RESEND_API_KEY) throw new Error('RESEND_API_KEY environment variable is not set');
+    _resend = new Resend(process.env.RESEND_API_KEY);
+  }
+  return _resend;
+};
 const FROM = process.env.FROM_EMAIL || 'onboarding@resend.dev';
 const BASE_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
 export const sendVerificationEmail = async (email, token) => {
   const link = `${BASE_URL}/verify-email?token=${token}`;
-  await resend.emails.send({
+  await getResend().emails.send({
     from: FROM,
     to: email,
     subject: 'Confirm your BetSlate account',
@@ -27,7 +34,7 @@ export const sendVerificationEmail = async (email, token) => {
 
 export const sendEmailChangeConfirmation = async (newEmail, token) => {
   const link = `${BASE_URL}/confirm-email-change?token=${token}`;
-  await resend.emails.send({
+  await getResend().emails.send({
     from: FROM,
     to: newEmail,
     subject: 'Confirm your new BetSlate email address',
@@ -47,7 +54,7 @@ export const sendEmailChangeConfirmation = async (newEmail, token) => {
 };
 
 export const sendPasswordChangedEmail = async (email) => {
-  await resend.emails.send({
+  await getResend().emails.send({
     from: FROM,
     to: email,
     subject: 'Your BetSlate password has been changed',
@@ -69,7 +76,7 @@ export const sendPasswordChangedEmail = async (email) => {
 
 export const sendPasswordResetEmail = async (email, token) => {
   const link = `${BASE_URL}/reset-password?token=${token}`;
-  await resend.emails.send({
+  await getResend().emails.send({
     from: FROM,
     to: email,
     subject: 'Reset your BetSlate password',
