@@ -54,9 +54,9 @@ const BetCard: React.FC<BetCardProps> = ({ bet, settings, onUpdate, onDelete, on
     
     // Check if enabling auto-schedule on a bet scheduled in the past
     if (!bet.autoPost) {
-      const effectiveScheduleTime = bet.customScheduleTime 
-        ? bet.customScheduleTime 
-        : (bet.matchTimestamp ? bet.matchTimestamp - (settings.scheduleOffsetMinutes * 60000) : 0);
+      const effectiveScheduleTime = customScheduleTs > 0
+        ? customScheduleTs
+        : (matchTs > 0 ? matchTs - scheduleOffsetMs : 0);
       
       if (effectiveScheduleTime > 0 && effectiveScheduleTime < Date.now()) {
         const minutesAgo = Math.round((Date.now() - effectiveScheduleTime) / 60000);
@@ -84,23 +84,34 @@ const BetCard: React.FC<BetCardProps> = ({ bet, settings, onUpdate, onDelete, on
     }
   };
 
-  const effectiveTime = bet.customScheduleTime 
-    ? bet.customScheduleTime 
-    : (bet.matchTimestamp ? bet.matchTimestamp - (settings.scheduleOffsetMinutes * 60000) : 0);
+  const customScheduleTs = Number(bet.customScheduleTime) || 0;
+  const matchTs = Number(bet.matchTimestamp) || 0;
+  const scheduleOffsetMs = (Number(settings.scheduleOffsetMinutes) || 15) * 60000;
+
+  const effectiveTime = customScheduleTs > 0
+    ? customScheduleTs
+    : (matchTs > 0 ? matchTs - scheduleOffsetMs : 0);
 
   const isScheduledInPast = effectiveTime > 0 && effectiveTime < Date.now();
   const minutesAgo = isScheduledInPast ? Math.round((Date.now() - effectiveTime) / 60000) : 0;
 
-  const scheduleDisplay = effectiveTime > 0 
-    ? new Date(effectiveTime).toLocaleString('en-US', { 
-        hour: '2-digit', 
-        minute: '2-digit', 
-        month: 'short', 
+  const scheduleDisplay = (() => {
+    if (effectiveTime <= 0) return 'Not Scheduled';
+    const d = new Date(effectiveTime);
+    if (isNaN(d.getTime())) return 'Not Scheduled';
+    try {
+      return d.toLocaleString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        month: 'short',
         day: 'numeric',
         timeZone: settings.slateTimezone || 'America/New_York',
         timeZoneName: 'short',
-      })
-    : 'Not Scheduled';
+      });
+    } catch {
+      return d.toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' });
+    }
+  })();
 
   const getInitials = (name: string) => {
     const words = name.trim().split(/\s+/);
@@ -108,21 +119,26 @@ const BetCard: React.FC<BetCardProps> = ({ bet, settings, onUpdate, onDelete, on
     return words.slice(0, 2).map(w => w[0]).join('').toUpperCase();
   };
 
-  const formatForInput = (timestamp: number) => {
+  const formatForInput = (timestamp: number): string => {
     const userTimezone = settings.slateTimezone || 'America/New_York';
-    const date = new Date(timestamp);
-    
-    const formatted = new Intl.DateTimeFormat('sv-SE', {
+    const numericTs = Number(timestamp);
+    if (!numericTs || isNaN(numericTs)) return '';
+    const date = new Date(numericTs);
+    if (isNaN(date.getTime())) return '';
+
+    const parts = new Intl.DateTimeFormat('en-US', {
       timeZone: userTimezone,
       year: 'numeric',
-      month: '2-digit', 
+      month: '2-digit',
       day: '2-digit',
       hour: '2-digit',
       minute: '2-digit',
-      hour12: false
-    }).format(date);
-    
-    return formatted.replace(' ', 'T');
+      hour12: false,
+    }).formatToParts(date);
+
+    const get = (type: string) => parts.find(p => p.type === type)?.value ?? '00';
+    const hour = String(Number(get('hour')) % 24).padStart(2, '0'); // handle 24:00 edge case
+    return `${get('year')}-${get('month')}-${get('day')}T${hour}:${get('minute')}`;
   };
 
   return (
@@ -182,36 +198,40 @@ const BetCard: React.FC<BetCardProps> = ({ bet, settings, onUpdate, onDelete, on
                            const [datePart, timePart] = inputValue.split('T');
                            const [year, month, day] = datePart.split('-').map(Number);
                            const [hour, minute] = timePart.split(':').map(Number);
-                           
+
                            const userTimezone = settings.slateTimezone || 'America/New_York';
-                           
-                           // Create UTC timestamp
-                           const testUTC = Date.UTC(year, month - 1, day, hour, minute);
-                           const testDate = new Date(testUTC);
-                           
-                           // Format it back in the user's timezone to see what it would be
-                           const formattedInUserTZ = new Intl.DateTimeFormat('sv-SE', {
+
+                           // Treat the datetime-local value as local time in the user's configured timezone.
+                           // Step 1: create a naive UTC timestamp using the raw numbers.
+                           const naiveUTC = Date.UTC(year, month - 1, day, hour, minute);
+
+                           // Step 2: find what the target timezone shows for that UTC moment using
+                           // formatToParts — avoids locale-specific string separator issues.
+                           const tzParts = new Intl.DateTimeFormat('en-US', {
                              timeZone: userTimezone,
                              year: 'numeric',
-                             month: '2-digit',
-                             day: '2-digit',
-                             hour: '2-digit',
-                             minute: '2-digit',
-                             hour12: false
-                           }).format(testDate);
-                           
-                           const [fDate, fTime] = formattedInUserTZ.split(' ');
-                           const [fYear, fMonth, fDay] = fDate.split('-').map(Number);
-                           const [fHour, fMin] = fTime.split(':').map(Number);
-                           
-                           // Calculate difference and adjust
-                           const hourDiff = hour - fHour;
-                           const minDiff = minute - fMin;
-                           const offsetMs = (hourDiff * 60 + minDiff) * 60 * 1000;
-                           
-                           const finalTimestamp = testUTC + offsetMs;
-                           
-                           onUpdate(bet.id, { customScheduleTime: finalTimestamp, autoPost: true }, true);
+                             month: 'numeric',
+                             day: 'numeric',
+                             hour: 'numeric',
+                             minute: 'numeric',
+                             hour12: false,
+                           }).formatToParts(new Date(naiveUTC));
+
+                           const getP = (type: string) => Number(tzParts.find(p => p.type === type)?.value ?? '0');
+                           const tzHour = getP('hour') % 24;
+                           const tzMinute = getP('minute');
+                           const tzMonth = getP('month');
+                           const tzDay = getP('day');
+                           const tzYear = getP('year');
+
+                           // Step 3: offset is the difference between the naive value and what the
+                           // timezone would display for it; add the offset to correct to real UTC.
+                           const tzNaive = Date.UTC(tzYear, tzMonth - 1, tzDay, tzHour, tzMinute);
+                           const finalTimestamp = naiveUTC + (naiveUTC - tzNaive);
+
+                           if (!isNaN(finalTimestamp)) {
+                             onUpdate(bet.id, { customScheduleTime: finalTimestamp, autoPost: true }, true);
+                           }
                          }
                          setShowScheduleEdit(false);
                          setTempScheduleTime('');
