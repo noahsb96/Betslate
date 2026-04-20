@@ -272,9 +272,9 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
   };
 
   const clearAllBets = async () => {
-    if (window.confirm(`Clear all bets for ${slateDate}? This cannot be undone.`)) {
-      await betsAPI.clearAll(slateDate, activeBot?.id);
-      setBets(prev => prev.filter(b => b.slateDate !== slateDate));
+    if (window.confirm(`Clear all bets in the queue? This cannot be undone.`)) {
+      await betsAPI.clearAll(undefined, activeBot?.id);
+      setBets([]);
     }
   };
   
