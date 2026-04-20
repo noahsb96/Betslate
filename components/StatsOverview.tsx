@@ -11,9 +11,10 @@ interface StatsOverviewProps {
   slateDate: string;
   onUpdateSettings: (s: AppSettings) => void;
   onDeleteBet: (id: string) => void;
+  botId?: string;
 }
 
-const StatsOverview: React.FC<StatsOverviewProps> = ({ bets, settings, slateDate, onUpdateSettings, onDeleteBet }) => {
+const StatsOverview: React.FC<StatsOverviewProps> = ({ bets, settings, slateDate, onUpdateSettings, onDeleteBet, botId }) => {
   const [recapTime, setRecapTime] = useState<string>('');
   const [recapScheduled, setRecapScheduled] = useState(false);
   const [showRecapSettings, setShowRecapSettings] = useState(false);
@@ -155,7 +156,7 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({ bets, settings, slateDate
         });
 
         // Save the recap snapshot to DB for calendar history
-        if (recapDate) {
+        if (recapDate && botId) {
           const roi = finishedBets.length > 0
             ? parseFloat(((netUnits / finishedBets.reduce((a, b) => a + b.units, 0)) * 100).toFixed(1))
             : 0;
@@ -171,7 +172,8 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({ bets, settings, slateDate
               pushes,
               net_units: parseFloat(formattedNetUnits),
               roi,
-              league_breakdown: leagueBD
+              league_breakdown: leagueBD,
+              botId
             });
           } catch (saveErr) {
             console.error('Failed to save recap snapshot:', saveErr);

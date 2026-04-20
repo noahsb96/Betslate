@@ -6,8 +6,17 @@ export enum BetResult {
   PUSH = 'PUSH'
 }
 
+export interface Bot {
+  id: string;
+  name: string;
+  order_index: number;
+  created_at: string;
+}
+
 export interface Bet {
   id: string;
+  botId?: string;
+  bot_id?: string;
   league: string;
   playerA: string;
   playerB: string;
@@ -55,6 +64,7 @@ export interface User {
 export interface DailyRecap {
   id?: string;
   user_id?: string;
+  bot_id?: string;
   date: string;
   wins: number;
   losses: number;

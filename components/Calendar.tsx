@@ -12,6 +12,7 @@ type CalendarView = 'month' | 'monthly-stats' | 'yearly';
 
 interface CalendarProps {
   settings: AppSettings;
+  botId?: string;
   onRestoreDate?: (date: string) => void;
 }
 
@@ -24,7 +25,7 @@ const SHORT_MONTH_NAMES = [
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
 ];
 
-const Calendar: React.FC<CalendarProps> = ({ settings, onRestoreDate }) => {
+const Calendar: React.FC<CalendarProps> = ({ settings, botId, onRestoreDate }) => {
   const today = new Date();
   const [view, setView] = useState<CalendarView>('month');
   const [year, setYear] = useState(today.getFullYear());
@@ -44,11 +45,12 @@ const Calendar: React.FC<CalendarProps> = ({ settings, onRestoreDate }) => {
   }, [view, year, month]);
 
   const loadMonthData = async () => {
+    if (!botId) return;
     setLoading(true);
     try {
       const [calData, monthData] = await Promise.all([
-        recapsAPI.getCalendar(year, month),
-        recapsAPI.getMonthly(year, month)
+        recapsAPI.getCalendar(year, month, botId),
+        recapsAPI.getMonthly(year, month, botId)
       ]);
       setCalendarDays(calData);
       setMonthlyData(monthData);
@@ -60,9 +62,10 @@ const Calendar: React.FC<CalendarProps> = ({ settings, onRestoreDate }) => {
   };
 
   const loadYearData = async () => {
+    if (!botId) return;
     setLoading(true);
     try {
-      const data = await recapsAPI.getYearly(year);
+      const data = await recapsAPI.getYearly(year, botId);
       setYearlyData(data);
     } catch (err) {
       console.error('Failed to load yearly data:', err);
@@ -184,6 +187,7 @@ const Calendar: React.FC<CalendarProps> = ({ settings, onRestoreDate }) => {
       <DayDetailView
         date={selectedDate}
         settings={settings}
+        botId={botId}
         onBack={() => setSelectedDate(null)}
         onRestoreDate={onRestoreDate}
       />

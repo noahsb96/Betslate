@@ -1,7 +1,24 @@
 import pool from './database.js';
 
+// Per-webhook rate-limit tracking (keyed by webhook URL)
+const webhookLastPost = new Map();   // url → timestamp of last successful post
+const webhookRetryAfter = new Map(); // url → timestamp when rate limit expires
+
+const MIN_POST_INTERVAL_MS = 1500; // minimum 1.5s between posts to the same webhook
+
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
 const postToDiscord = async (bet, settings) => {
   if (!settings.discordWebhookUrl) return false;
+
+  const url = settings.discordWebhookUrl;
+
+  // Honour Discord retry_after backoff
+  const retryAfter = webhookRetryAfter.get(url);
+  if (retryAfter && Date.now() < retryAfter) {
+    console.log(`⏳ Webhook rate-limited, skipping until ${new Date(retryAfter).toISOString()}`);
+    return false;
+  }
 
   let mentionContent = settings.mentionString || "";
   if (mentionContent && /^\d+$/.test(mentionContent.trim())) {
@@ -38,11 +55,25 @@ const postToDiscord = async (bet, settings) => {
   };
 
   try {
-    const response = await fetch(settings.discordWebhookUrl, {
+    const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
+
+    if (response.status === 429) {
+      let retryMs = 5000;
+      try {
+        const body = await response.json();
+        retryMs = Math.ceil((body.retry_after || 5) * 1000);
+      } catch { /* ignore parse errors */ }
+      webhookRetryAfter.set(url, Date.now() + retryMs);
+      console.warn(`⚠️  Discord rate limit hit for webhook. Retry after ${retryMs}ms`);
+      return false;
+    }
+
+    webhookLastPost.set(url, Date.now());
+    webhookRetryAfter.delete(url);
     return response.ok;
   } catch (e) {
     console.error("Discord Webhook Error:", e);
@@ -55,13 +86,14 @@ export const startScheduler = () => {
     try {
       const now = Date.now();
 
+      // Join through bot_id so each bot uses its own settings
       const result = await pool.query(`
         SELECT b.*, 
           s."discordWebhookUrl", s."botName", s."botAvatarUrl", s."mentionString",
           s."scheduleOffsetMinutes", s."slateTimezone", s."defaultOdds",
           s."defaultBetAlertTitle", s."betEmbedColor"
         FROM bets b
-        LEFT JOIN settings s ON b.user_id = s.user_id
+        LEFT JOIN settings s ON b.bot_id = s.bot_id
         WHERE b."autoPost" = true AND b."isPosted" = false
       `);
 
@@ -82,6 +114,16 @@ export const startScheduler = () => {
           }
 
           if (now >= postTime) {
+            // Enforce minimum inter-post interval per webhook to avoid rate limits
+            const webhookUrl = row.discordWebhookUrl;
+            if (webhookUrl) {
+              const lastPost = webhookLastPost.get(webhookUrl) || 0;
+              if (now - lastPost < MIN_POST_INTERVAL_MS) {
+                // Too soon — skip this tick, will retry on next scheduler run
+                continue;
+              }
+            }
+
             console.log(`🔔 Auto-posting bet: ${row.playerA} vs ${row.playerB}`);
             const success = await postToDiscord(row, row);
 
@@ -91,6 +133,9 @@ export const startScheduler = () => {
             } else {
               console.log(`❌ Failed to post: ${row.playerA} vs ${row.playerB}`);
             }
+
+            // Small delay between consecutive posts in the same scheduler tick
+            await sleep(200);
           }
         }
       }

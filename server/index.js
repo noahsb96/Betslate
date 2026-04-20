@@ -8,6 +8,7 @@ import betsRouter from './routes/bets.js';
 import settingsRouter from './routes/settings.js';
 import authRouter from './routes/auth.js';
 import recapsRouter from './routes/recaps.js';
+import botsRouter from './routes/bots.js';
 import { initDatabase } from './database.js';
 import { startScheduler } from './scheduler.js';
 import { requireAuth } from './middleware/auth.js';
@@ -48,6 +49,7 @@ app.use('/api/', globalLimiter);
 await initDatabase();
 
 app.use('/api/auth', authRouter);
+app.use('/api/bots', requireAuth, botsRouter);
 app.use('/api/bets', requireAuth, betsRouter);
 app.use('/api/settings', requireAuth, settingsRouter);
 app.use('/api/recaps', requireAuth, recapsRouter);

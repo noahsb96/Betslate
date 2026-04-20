@@ -1,7 +1,7 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
-import { Settings, RefreshCw, Trash, Plus, Calendar, Clock, Layers, FileText, X, LogOut, UserCircle, RotateCcw } from 'lucide-react';
+import { Settings, RefreshCw, Trash, Plus, Calendar, Clock, Layers, FileText, X, LogOut, UserCircle, RotateCcw, Bot, Pencil, Check } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import Uploader from './components/Uploader';
 import BetCard from './components/BetCard';
@@ -15,9 +15,9 @@ import VerifyEmailPage from './components/auth/VerifyEmailPage';
 import AccountPage from './components/auth/AccountPage';
 import ConfirmEmailChangePage from './components/auth/ConfirmEmailChangePage';
 import { analyzeSlateImage } from './services/geminiService';
-import { betsAPI, settingsAPI } from './services/api';
+import { betsAPI, settingsAPI, botsAPI } from './services/api';
 import { authAPI, getToken, clearToken } from './services/authAPI';
-import { Bet, BetResult, AppSettings, User } from './types';
+import { Bet, BetResult, AppSettings, User, Bot as BotType } from './types';
 
 const DEFAULT_SETTINGS: AppSettings = {
     mentionString: '@Chefs Plays',
@@ -70,17 +70,37 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
   const [showSettings, setShowSettings] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'queue' | 'history' | 'calendar'>('queue');
+  const [historyFilter, setHistoryFilter] = useState<'all' | 'pending' | 'won' | 'lost' | 'push'>('all');
   const [slateDate, setSlateDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [restoredDate, setRestoredDate] = useState<string | null>(null);
   const [appSettings, setAppSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [scrollToBetId, setScrollToBetId] = useState<string | null>(null);
 
+  // ── Multi-bot state ──────────────────────────────────────────────────────
+  const [bots, setBots] = useState<BotType[]>([]);
+  const [activeBot, setActiveBot] = useState<BotType | null>(null);
+  const [renamingBotId, setRenamingBotId] = useState<string | null>(null);
+  const [renamingBotName, setRenamingBotName] = useState<string>('');
+  const [newBotName, setNewBotName] = useState<string>('');
+  const [showNewBotInput, setShowNewBotInput] = useState(false);
+  const renamingInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
      const loadData = async () => {
        try {
+         // Load bots first; create Bot 1 if the user has none
+         let botList: BotType[] = await botsAPI.getAll();
+         if (botList.length === 0) {
+           const newBot = await botsAPI.create('Bot 1');
+           botList = [newBot];
+         }
+         setBots(botList);
+         const bot = botList[0];
+         setActiveBot(bot);
+
          const [betsData, settingsData] = await Promise.all([
-           betsAPI.getAll(),
-           settingsAPI.get()
+           betsAPI.getAll(bot.id),
+           settingsAPI.get(bot.id)
          ]);
          setBets(betsData);
          setAppSettings(settingsData);
@@ -96,9 +116,9 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
 
   useEffect(() => {
     const saveSettings = async () => {
-      if (appSettings !== DEFAULT_SETTINGS) {
+      if (appSettings !== DEFAULT_SETTINGS && activeBot) {
         try {
-          await settingsAPI.update(appSettings);
+          await settingsAPI.update(activeBot.id, appSettings);
         } catch (err) {
           console.error('Failed to save settings:', err);
         }
@@ -108,9 +128,10 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
   }, [appSettings]);
 
   useEffect(() => {
+    if (!activeBot) return;
     const pollBets = async () => {
       try {
-        const betsData = await betsAPI.getAll();
+        const betsData = await betsAPI.getAll(activeBot.id);
         setBets(betsData);
       } catch (err) {
         console.error('Failed to refresh bets:', err);
@@ -120,7 +141,7 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
     const intervalId = setInterval(pollBets, 10000);
 
     return () => clearInterval(intervalId);
-  }, []);
+  }, [activeBot]);
 
   useEffect(() => {
     if (scrollToBetId) {
@@ -195,6 +216,7 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
       setShowSettings(true);
       return;
     }
+    if (!activeBot) return;
     
     console.log('Using API Key:', apiKey?.substring(0, 10) + '...');
     setLoading(true);
@@ -204,6 +226,7 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
         const newBetsRaw = await analyzeSlateImage(base64, apiKey, appSettings.aiInstructions);
         const processedBets = newBetsRaw.map(b => ({
             ...b,
+            botId: activeBot.id,
             slateDate,
             matchTimestamp: parseMatchTime(b.time, slateDate, appSettings.slateTimezone),
             autoPost: false,
@@ -250,14 +273,16 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
 
   const clearAllBets = async () => {
     if (window.confirm(`Clear all bets for ${slateDate}? This cannot be undone.`)) {
-      await betsAPI.clearAll(slateDate);
+      await betsAPI.clearAll(slateDate, activeBot?.id);
       setBets(prev => prev.filter(b => b.slateDate !== slateDate));
     }
   };
   
   const handleManualAdd = async () => {
+     if (!activeBot) return;
      const newBet: Bet = {
          id: uuidv4(),
+         botId: activeBot.id,
          league: 'Manual Entry',
          playerA: 'Player A',
          playerB: 'Player B',
@@ -276,8 +301,10 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
   };
 
   const handleManualAddPosted = async () => {
+     if (!activeBot) return;
      const newBet: Bet = {
          id: uuidv4(),
+         botId: activeBot.id,
          league: 'Manual Entry',
          playerA: 'Player A',
          playerB: 'Player B',
@@ -385,12 +412,80 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
     }
   };
 
+  // ── Bot management handlers ──────────────────────────────────────────────
+  const handleSwitchBot = async (bot: BotType) => {
+    if (bot.id === activeBot?.id) return;
+    setActiveBot(bot);
+    try {
+      const [betsData, settingsData] = await Promise.all([
+        betsAPI.getAll(bot.id),
+        settingsAPI.get(bot.id)
+      ]);
+      setBets(betsData);
+      setAppSettings(settingsData);
+    } catch (err) {
+      console.error('Failed to load bot data:', err);
+    }
+  };
+
+  const handleCreateBot = async () => {
+    const name = newBotName.trim();
+    if (!name) return;
+    try {
+      const newBot = await botsAPI.create(name);
+      const updatedBots = [...bots, newBot];
+      setBots(updatedBots);
+      setNewBotName('');
+      setShowNewBotInput(false);
+      await handleSwitchBot(newBot);
+    } catch (err) {
+      console.error('Failed to create bot:', err);
+    }
+  };
+
+  const handleRenameBot = async (botId: string) => {
+    const name = renamingBotName.trim();
+    if (!name) { setRenamingBotId(null); return; }
+    try {
+      const updated = await botsAPI.rename(botId, name);
+      setBots(prev => prev.map(b => b.id === botId ? updated : b));
+      if (activeBot?.id === botId) setActiveBot(updated);
+    } catch (err) {
+      console.error('Failed to rename bot:', err);
+    } finally {
+      setRenamingBotId(null);
+    }
+  };
+
+  const handleDeleteBot = async (botId: string) => {
+    if (!window.confirm('Delete this bot and all its bets and recaps? This cannot be undone.')) return;
+    try {
+      await botsAPI.delete(botId);
+      const updatedBots = bots.filter(b => b.id !== botId);
+      setBots(updatedBots);
+      if (activeBot?.id === botId && updatedBots.length > 0) {
+        await handleSwitchBot(updatedBots[0]);
+      }
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete bot');
+    }
+  };
+
   const queueBets = bets.filter(b => !b.isPosted).sort((a, b) => {
     const timeA = a.customScheduleTime || (a.matchTimestamp ? a.matchTimestamp - (appSettings.scheduleOffsetMinutes * 60000) : 0);
     const timeB = b.customScheduleTime || (b.matchTimestamp ? b.matchTimestamp - (appSettings.scheduleOffsetMinutes * 60000) : 0);
     return timeA - timeB;
   });
   const historyBets = bets.filter(b => b.isPosted && b.slateDate === slateDate);
+
+  const filteredHistoryBets = historyBets.filter(bet => {
+    if (historyFilter === 'all') return true;
+    if (historyFilter === 'pending') return bet.result === BetResult.PENDING;
+    if (historyFilter === 'won') return bet.result === BetResult.WIN;
+    if (historyFilter === 'lost') return bet.result === BetResult.LOSS;
+    if (historyFilter === 'push') return bet.result === BetResult.PUSH;
+    return true;
+  });
 
   return (
     <div className="min-h-screen bg-[#36393f] font-sans text-gray-100 pb-20">
@@ -429,6 +524,93 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
             </button>
           </div>
         </div>
+
+        {/* ── Bot selector tabs ─────────────────────────────────────────── */}
+        <div className="max-w-4xl mx-auto mt-3 flex items-center gap-1 overflow-x-auto pb-1">
+          {bots.map(bot => (
+            <div key={bot.id} className="flex-shrink-0 flex items-center group">
+              {renamingBotId === bot.id ? (
+                <div className="flex items-center gap-1">
+                  <input
+                    ref={renamingInputRef}
+                    value={renamingBotName}
+                    onChange={e => setRenamingBotName(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') handleRenameBot(bot.id);
+                      if (e.key === 'Escape') setRenamingBotId(null);
+                    }}
+                    className="bg-[#40444b] border border-indigo-500 rounded px-2 py-1 text-xs text-white w-24 focus:outline-none"
+                    autoFocus
+                  />
+                  <button
+                    onClick={() => handleRenameBot(bot.id)}
+                    className="p-1 text-green-400 hover:text-green-200"
+                  ><Check size={12} /></button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => handleSwitchBot(bot)}
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium transition-all ${
+                    activeBot?.id === bot.id
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-[#2f3136] text-gray-400 hover:text-white hover:bg-[#40444b]'
+                  }`}
+                >
+                  <Bot size={12} />
+                  {bot.name}
+                </button>
+              )}
+              {/* Per-bot action icons (shown on hover) */}
+              {renamingBotId !== bot.id && (
+                <div className="hidden group-hover:flex items-center ml-0.5 gap-0.5">
+                  <button
+                    onClick={() => {
+                      setRenamingBotId(bot.id);
+                      setRenamingBotName(bot.name);
+                      setTimeout(() => renamingInputRef.current?.focus(), 0);
+                    }}
+                    className="p-1 text-gray-500 hover:text-gray-200 transition-colors"
+                    title="Rename bot"
+                  ><Pencil size={10} /></button>
+                  {bots.length > 1 && (
+                    <button
+                      onClick={() => handleDeleteBot(bot.id)}
+                      className="p-1 text-gray-500 hover:text-red-400 transition-colors"
+                      title="Delete bot"
+                    ><Trash size={10} /></button>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+
+          {/* Add new bot */}
+          {showNewBotInput ? (
+            <div className="flex-shrink-0 flex items-center gap-1">
+              <input
+                value={newBotName}
+                onChange={e => setNewBotName(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') handleCreateBot();
+                  if (e.key === 'Escape') { setShowNewBotInput(false); setNewBotName(''); }
+                }}
+                placeholder="Bot name"
+                className="bg-[#40444b] border border-gray-600 rounded px-2 py-1 text-xs text-white w-24 focus:outline-none focus:border-indigo-500"
+                autoFocus
+              />
+              <button onClick={handleCreateBot} className="p-1 text-green-400 hover:text-green-200"><Check size={12} /></button>
+              <button onClick={() => { setShowNewBotInput(false); setNewBotName(''); }} className="p-1 text-gray-500 hover:text-white"><X size={12} /></button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowNewBotInput(true)}
+              className="flex-shrink-0 flex items-center gap-1 px-2 py-1 rounded text-xs text-gray-500 hover:text-white hover:bg-[#40444b] transition-colors"
+              title="Add new bot"
+            >
+              <Plus size={12} /> Add Bot
+            </button>
+          )}
+        </div>
       </header>
 
       <main className="max-w-4xl mx-auto p-4 md:p-6">
@@ -436,8 +618,9 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
         {showSettings && (
           <div className="bg-[#2f3136] rounded-lg p-4 md:p-6 mb-8 border border-gray-700 shadow-xl animate-fade-in relative z-50 max-w-full overflow-x-hidden">
              <button onClick={() => setShowSettings(false)} className="absolute top-4 right-4 text-gray-500 hover:text-white"><X size={20}/></button>
-            <h3 className="text-lg font-bold mb-4 flex items-center border-b border-gray-700 pb-2">
-              <Settings size={18} className="mr-2" /> Application Settings
+            <h3 className="text-lg font-bold mb-1 flex items-center border-b border-gray-700 pb-2">
+              <Settings size={18} className="mr-2" /> Settings
+              {activeBot && <span className="ml-2 text-sm font-normal text-indigo-400">— {activeBot.name}</span>}
             </h3>
             <div className="space-y-4">
                
@@ -711,9 +894,9 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
                 </div>
               </div>
             )}
-            <StatsOverview bets={bets} settings={appSettings} slateDate={slateDate} onUpdateSettings={setAppSettings} onDeleteBet={handleDeleteBet} />
+            <StatsOverview bets={bets} settings={appSettings} slateDate={slateDate} onUpdateSettings={setAppSettings} onDeleteBet={handleDeleteBet} botId={activeBot?.id} />
             
-            <div className="flex justify-between items-center mb-4">
+            <div className="flex justify-between items-center mb-3">
                <button onClick={handleManualAddPosted} className="flex items-center text-sm px-3 py-2 bg-[#2f3136] hover:bg-[#40444b] rounded-lg border border-gray-700 transition-colors">
                   <Plus size={16} className="mr-1 text-green-400"/> Add Manual Play
                </button>
@@ -724,13 +907,43 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
                )}
             </div>
 
+            {/* History sub-filter tabs */}
+            <div className="flex items-center gap-1.5 mb-4 flex-wrap">
+              {([ 
+                { key: 'all',     label: 'All',     count: historyBets.length },
+                { key: 'pending', label: 'Pending', count: historyBets.filter(b => b.result === BetResult.PENDING).length },
+                { key: 'won',     label: 'Won',     count: historyBets.filter(b => b.result === BetResult.WIN).length },
+                { key: 'lost',    label: 'Lost',    count: historyBets.filter(b => b.result === BetResult.LOSS).length },
+                { key: 'push',    label: 'Push',    count: historyBets.filter(b => b.result === BetResult.PUSH).length },
+              ] as const).map(tab => (
+                <button
+                  key={tab.key}
+                  onClick={() => setHistoryFilter(tab.key)}
+                  className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
+                    historyFilter === tab.key
+                      ? tab.key === 'won' ? 'bg-green-700 text-white'
+                        : tab.key === 'lost' ? 'bg-red-700 text-white'
+                        : tab.key === 'pending' ? 'bg-yellow-700 text-white'
+                        : tab.key === 'push' ? 'bg-blue-700 text-white'
+                        : 'bg-indigo-600 text-white'
+                      : 'bg-[#2f3136] text-gray-400 hover:text-white hover:bg-[#40444b]'
+                  }`}
+                >
+                  {tab.label} <span className="opacity-75">({tab.count})</span>
+                </button>
+              ))}
+            </div>
+
             <div className="space-y-2">
-              {historyBets.length === 0 ? (
+              {filteredHistoryBets.length === 0 ? (
                  <div className="text-center py-12 text-gray-500">
-                    No posted bets for {slateDate}.
+                    {historyFilter === 'all'
+                      ? `No posted bets for ${slateDate}.`
+                      : `No ${historyFilter} bets for ${slateDate}.`
+                    }
                  </div>
               ) : (
-                historyBets.map(bet => (
+                filteredHistoryBets.map(bet => (
                   <BetCard 
                     key={bet.id} 
                     bet={bet} 
@@ -750,6 +963,7 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
           <div className="bg-[#2f3136] rounded-lg p-4 md:p-6 shadow-lg">
             <CalendarView
               settings={appSettings}
+              botId={activeBot?.id}
               onRestoreDate={(date) => {
                 setSlateDate(date);
                 setRestoredDate(date);

@@ -20,9 +20,46 @@ const handleResponse = async (res: Response) => {
   return res;
 };
 
-export const betsAPI = {
+export const botsAPI = {
   getAll: async () => {
-    const res = await fetch(`${API_URL}/bets`, { headers: authHeaders() });
+    const res = await fetch(`${API_URL}/bots`, { headers: authHeaders() });
+    await handleResponse(res);
+    return res.json();
+  },
+
+  create: async (name: string) => {
+    const res = await fetch(`${API_URL}/bots`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ name })
+    });
+    await handleResponse(res);
+    return res.json();
+  },
+
+  rename: async (id: string, name: string) => {
+    const res = await fetch(`${API_URL}/bots/${id}`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify({ name })
+    });
+    await handleResponse(res);
+    return res.json();
+  },
+
+  delete: async (id: string) => {
+    const res = await fetch(`${API_URL}/bots/${id}`, {
+      method: 'DELETE',
+      headers: authHeaders()
+    });
+    await handleResponse(res);
+  }
+};
+
+export const betsAPI = {
+  getAll: async (botId?: string) => {
+    const url = botId ? `${API_URL}/bets?botId=${encodeURIComponent(botId)}` : `${API_URL}/bets`;
+    const res = await fetch(url, { headers: authHeaders() });
     await handleResponse(res);
     return res.json();
   },
@@ -55,8 +92,12 @@ export const betsAPI = {
     await handleResponse(res);
   },
 
-  clearAll: async (slateDate?: string) => {
-    const url = slateDate ? `${API_URL}/bets?slateDate=${encodeURIComponent(slateDate)}` : `${API_URL}/bets`;
+  clearAll: async (slateDate?: string, botId?: string) => {
+    const params = new URLSearchParams();
+    if (slateDate) params.set('slateDate', slateDate);
+    if (botId) params.set('botId', botId);
+    const qs = params.toString();
+    const url = qs ? `${API_URL}/bets?${qs}` : `${API_URL}/bets`;
     const res = await fetch(url, {
       method: 'DELETE',
       headers: authHeaders()
@@ -66,17 +107,19 @@ export const betsAPI = {
 };
 
 export const settingsAPI = {
-  get: async () => {
-    const res = await fetch(`${API_URL}/settings`, { headers: authHeaders() });
+  get: async (botId: string) => {
+    const res = await fetch(`${API_URL}/settings?botId=${encodeURIComponent(botId)}`, {
+      headers: authHeaders()
+    });
     await handleResponse(res);
     return res.json();
   },
 
-  update: async (settings) => {
+  update: async (botId: string, settings) => {
     const res = await fetch(`${API_URL}/settings`, {
       method: 'PUT',
       headers: authHeaders(),
-      body: JSON.stringify(settings)
+      body: JSON.stringify({ ...settings, botId })
     });
     await handleResponse(res);
     return res.json();
@@ -84,10 +127,11 @@ export const settingsAPI = {
 };
 
 export const recapsAPI = {
-  getCalendar: async (year: number, month: number) => {
-    const res = await fetch(`${API_URL}/recaps/calendar?year=${year}&month=${month}`, {
-      headers: authHeaders()
-    });
+  getCalendar: async (year: number, month: number, botId: string) => {
+    const res = await fetch(
+      `${API_URL}/recaps/calendar?year=${year}&month=${month}&botId=${encodeURIComponent(botId)}`,
+      { headers: authHeaders() }
+    );
     await handleResponse(res);
     return res.json();
   },
@@ -100,6 +144,7 @@ export const recapsAPI = {
     net_units: number;
     roi: number;
     league_breakdown: Array<{ league: string; units: number }>;
+    botId: string;
   }) => {
     const res = await fetch(`${API_URL}/recaps/daily`, {
       method: 'POST',
@@ -110,26 +155,29 @@ export const recapsAPI = {
     return res.json();
   },
 
-  getDaily: async (date: string) => {
-    const res = await fetch(`${API_URL}/recaps/daily/${date}`, {
-      headers: authHeaders()
-    });
+  getDaily: async (date: string, botId: string) => {
+    const res = await fetch(
+      `${API_URL}/recaps/daily/${date}?botId=${encodeURIComponent(botId)}`,
+      { headers: authHeaders() }
+    );
     await handleResponse(res);
     return res.json();
   },
 
-  getMonthly: async (year: number, month: number) => {
-    const res = await fetch(`${API_URL}/recaps/monthly/${year}/${month}`, {
-      headers: authHeaders()
-    });
+  getMonthly: async (year: number, month: number, botId: string) => {
+    const res = await fetch(
+      `${API_URL}/recaps/monthly/${year}/${month}?botId=${encodeURIComponent(botId)}`,
+      { headers: authHeaders() }
+    );
     await handleResponse(res);
     return res.json();
   },
 
-  getYearly: async (year: number) => {
-    const res = await fetch(`${API_URL}/recaps/yearly/${year}`, {
-      headers: authHeaders()
-    });
+  getYearly: async (year: number, botId: string) => {
+    const res = await fetch(
+      `${API_URL}/recaps/yearly/${year}?botId=${encodeURIComponent(botId)}`,
+      { headers: authHeaders() }
+    );
     await handleResponse(res);
     return res.json();
   }

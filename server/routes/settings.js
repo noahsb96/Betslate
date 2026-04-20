@@ -27,74 +27,78 @@ CRITICAL RULES:
    - **ALLOWED LEAGUES**: Only use one of these 4 leagues: "Czech Liga Pro", "TT Elite Series", "TT Cup", "Setka Cup".
    - **DEFAULT**: If the league cannot be determined or doesn't match one of the 4 allowed leagues, use "TT Elite Series".`;
 
+const formatSettings = (s, defaults = {}) => ({
+  mentionString: s.mentionString ?? defaults.mentionString ?? '@Chefs Plays',
+  discordWebhookUrl: s.discordWebhookUrl ?? '',
+  recapWebhookUrl: s.recapWebhookUrl ?? '',
+  botName: s.botName ?? 'AI BetSlate Automator',
+  botAvatarUrl: s.botAvatarUrl ?? '',
+  scheduleOffsetMinutes: s.scheduleOffsetMinutes ?? 15,
+  slateTimezone: s.slateTimezone ?? 'America/New_York',
+  defaultOdds: s.defaultOdds ?? '-120',
+  aiInstructions: s.aiInstructions || DEFAULT_AI_INSTRUCTIONS,
+  recapTitle: s.recapTitle || 'Daily Recap',
+  recapIncludeDate: s.recapIncludeDate ?? true,
+  recapIncludeRecord: s.recapIncludeRecord ?? true,
+  recapIncludeNetUnits: s.recapIncludeNetUnits ?? true,
+  recapIncludeROI: s.recapIncludeROI ?? true,
+  recapIncludeLeagueStats: s.recapIncludeLeagueStats ?? false,
+  defaultBetAlertTitle: s.defaultBetAlertTitle || '📢 Bet Alert',
+  betEmbedColor: s.betEmbedColor || 16731469,
+  recapEmbedColor: s.recapEmbedColor || 16731469
+});
+
+// Verify botId belongs to the authenticated user
+const verifyBotOwnership = async (botId, userId) => {
+  const result = await pool.query(
+    'SELECT id FROM bots WHERE id = $1 AND user_id = $2',
+    [botId, userId]
+  );
+  return result.rows.length > 0;
+};
+
+// GET /api/settings?botId=xxx
 router.get('/', async (req, res) => {
   try {
+    const { botId } = req.query;
+    if (!botId) return res.status(400).json({ error: 'botId query parameter is required' });
+
+    const owned = await verifyBotOwnership(botId, req.user.id);
+    if (!owned) return res.status(403).json({ error: 'Bot not found' });
+
     const result = await pool.query(
-      'SELECT * FROM settings WHERE user_id = $1',
-      [req.user.id]
+      'SELECT * FROM settings WHERE bot_id = $1',
+      [botId]
     );
 
     if (result.rows.length === 0) {
-      return res.json({
-        mentionString: '@Chefs Plays',
-        discordWebhookUrl: '',
-        recapWebhookUrl: '',
-        botName: 'AI BetSlate Automator',
-        botAvatarUrl: '',
-        scheduleOffsetMinutes: 15,
-        slateTimezone: 'America/New_York',
-        defaultOdds: '-120',
-        aiInstructions: DEFAULT_AI_INSTRUCTIONS,
-        recapTitle: 'Daily Recap',
-        recapIncludeDate: true,
-        recapIncludeRecord: true,
-        recapIncludeNetUnits: true,
-        recapIncludeROI: true,
-        recapIncludeLeagueStats: false,
-        defaultBetAlertTitle: '📢 Bet Alert',
-        betEmbedColor: 16731469,
-        recapEmbedColor: 16731469
-      });
+      return res.json(formatSettings({}));
     }
-
-    const s = result.rows[0];
-    res.json({
-      mentionString: s.mentionString,
-      discordWebhookUrl: s.discordWebhookUrl,
-      recapWebhookUrl: s.recapWebhookUrl,
-      botName: s.botName,
-      botAvatarUrl: s.botAvatarUrl,
-      scheduleOffsetMinutes: s.scheduleOffsetMinutes,
-      slateTimezone: s.slateTimezone,
-      defaultOdds: s.defaultOdds,
-      aiInstructions: s.aiInstructions || DEFAULT_AI_INSTRUCTIONS,
-      recapTitle: s.recapTitle || 'Daily Recap',
-      recapIncludeDate: s.recapIncludeDate ?? true,
-      recapIncludeRecord: s.recapIncludeRecord ?? true,
-      recapIncludeNetUnits: s.recapIncludeNetUnits ?? true,
-      recapIncludeROI: s.recapIncludeROI ?? true,
-      recapIncludeLeagueStats: s.recapIncludeLeagueStats ?? false,
-      defaultBetAlertTitle: s.defaultBetAlertTitle || '📢 Bet Alert',
-      betEmbedColor: s.betEmbedColor || 16731469,
-      recapEmbedColor: s.recapEmbedColor || 16731469
-    });
+    res.json(formatSettings(result.rows[0]));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
+// PUT /api/settings — body must include botId
 router.put('/', async (req, res) => {
   try {
     const s = req.body;
+    const botId = s.botId;
+    if (!botId) return res.status(400).json({ error: 'botId is required in request body' });
+
+    const owned = await verifyBotOwnership(botId, req.user.id);
+    if (!owned) return res.status(403).json({ error: 'Bot not found' });
+
     const result = await pool.query(
       `INSERT INTO settings (
-        user_id, "mentionString", "discordWebhookUrl", "recapWebhookUrl", "botName",
+        bot_id, user_id, "mentionString", "discordWebhookUrl", "recapWebhookUrl", "botName",
         "botAvatarUrl", "scheduleOffsetMinutes", "slateTimezone", "defaultOdds",
         "aiInstructions", "recapTitle", "recapIncludeDate", "recapIncludeRecord",
         "recapIncludeNetUnits", "recapIncludeROI", "recapIncludeLeagueStats",
         "defaultBetAlertTitle", "betEmbedColor", "recapEmbedColor"
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
-      ON CONFLICT (user_id) DO UPDATE SET
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
+      ON CONFLICT (bot_id) DO UPDATE SET
         "mentionString" = EXCLUDED."mentionString",
         "discordWebhookUrl" = EXCLUDED."discordWebhookUrl",
         "recapWebhookUrl" = EXCLUDED."recapWebhookUrl",
@@ -115,6 +119,7 @@ router.put('/', async (req, res) => {
         "recapEmbedColor" = EXCLUDED."recapEmbedColor"
       RETURNING *`,
       [
+        botId,
         req.user.id,
         s.mentionString || '',
         s.discordWebhookUrl || '',
@@ -137,31 +142,10 @@ router.put('/', async (req, res) => {
       ]
     );
 
-    const updated = result.rows[0];
-    res.json({
-      mentionString: updated.mentionString,
-      discordWebhookUrl: updated.discordWebhookUrl,
-      recapWebhookUrl: updated.recapWebhookUrl,
-      botName: updated.botName,
-      botAvatarUrl: updated.botAvatarUrl,
-      scheduleOffsetMinutes: updated.scheduleOffsetMinutes,
-      slateTimezone: updated.slateTimezone,
-      defaultOdds: updated.defaultOdds,
-      aiInstructions: updated.aiInstructions,
-      recapTitle: updated.recapTitle,
-      recapIncludeDate: updated.recapIncludeDate,
-      recapIncludeRecord: updated.recapIncludeRecord,
-      recapIncludeNetUnits: updated.recapIncludeNetUnits,
-      recapIncludeROI: updated.recapIncludeROI,
-      recapIncludeLeagueStats: updated.recapIncludeLeagueStats,
-      defaultBetAlertTitle: updated.defaultBetAlertTitle,
-      betEmbedColor: updated.betEmbedColor,
-      recapEmbedColor: updated.recapEmbedColor
-    });
+    res.json(formatSettings(result.rows[0]));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
 export default router;
-

@@ -9,8 +9,27 @@ const ALLOWED_UPDATE_FIELDS = new Set([
   'isPosted', 'customTitle', 'slateDate'
 ]);
 
+// Verify a botId belongs to the authenticated user
+const verifyBotOwnership = async (botId, userId) => {
+  const result = await pool.query(
+    'SELECT id FROM bots WHERE id = $1 AND user_id = $2',
+    [botId, userId]
+  );
+  return result.rows.length > 0;
+};
+
 router.get('/', async (req, res) => {
   try {
+    const { botId } = req.query;
+    if (botId) {
+      const owned = await verifyBotOwnership(botId, req.user.id);
+      if (!owned) return res.status(403).json({ error: 'Bot not found' });
+      const result = await pool.query(
+        'SELECT * FROM bets WHERE user_id = $1 AND bot_id = $2 ORDER BY timestamp DESC',
+        [req.user.id, botId]
+      );
+      return res.json(result.rows);
+    }
     const result = await pool.query(
       'SELECT * FROM bets WHERE user_id = $1 ORDER BY timestamp DESC',
       [req.user.id]
@@ -24,20 +43,27 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const bet = req.body;
+    const botId = bet.botId || null;
+
+    if (botId) {
+      const owned = await verifyBotOwnership(botId, req.user.id);
+      if (!owned) return res.status(403).json({ error: 'Bot not found' });
+    }
+
     await pool.query(
       `INSERT INTO bets (
-        id, user_id, league, "playerA", "playerB", time, type, units, odds, result, notes,
+        id, user_id, bot_id, league, "playerA", "playerB", time, type, units, odds, result, notes,
         timestamp, "matchTimestamp", "customScheduleTime", "autoPost", "isPosted", "customTitle", "slateDate"
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`,
       [
-        bet.id, req.user.id, bet.league, bet.playerA, bet.playerB, bet.time, bet.type,
+        bet.id, req.user.id, botId, bet.league, bet.playerA, bet.playerB, bet.time, bet.type,
         bet.units, bet.odds || null, bet.result, bet.notes || null,
         bet.timestamp, bet.matchTimestamp || null, bet.customScheduleTime || null,
         bet.autoPost ?? false, bet.isPosted ?? false, bet.customTitle || null,
         bet.slateDate || null
       ]
     );
-    res.status(201).json(bet);
+    res.status(201).json({ ...bet, botId });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -53,7 +79,7 @@ router.patch('/:id', async (req, res) => {
     let idx = 1;
 
     for (const [key, value] of Object.entries(updates)) {
-      if (key === 'id' || key === 'user_id' || !ALLOWED_UPDATE_FIELDS.has(key)) continue;
+      if (key === 'id' || key === 'user_id' || key === 'botId' || key === 'bot_id' || !ALLOWED_UPDATE_FIELDS.has(key)) continue;
       fields.push(`"${key}" = $${idx++}`);
       values.push(value);
     }
@@ -89,8 +115,23 @@ router.delete('/:id', async (req, res) => {
 
 router.delete('/', async (req, res) => {
   try {
-    const { slateDate } = req.query;
-    if (slateDate) {
+    const { slateDate, botId } = req.query;
+
+    if (botId) {
+      const owned = await verifyBotOwnership(botId, req.user.id);
+      if (!owned) return res.status(403).json({ error: 'Bot not found' });
+      if (slateDate) {
+        await pool.query(
+          'DELETE FROM bets WHERE user_id = $1 AND bot_id = $2 AND "slateDate" = $3',
+          [req.user.id, botId, slateDate]
+        );
+      } else {
+        await pool.query(
+          'DELETE FROM bets WHERE user_id = $1 AND bot_id = $2',
+          [req.user.id, botId]
+        );
+      }
+    } else if (slateDate) {
       await pool.query('DELETE FROM bets WHERE user_id = $1 AND "slateDate" = $2', [req.user.id, slateDate]);
     } else {
       await pool.query('DELETE FROM bets WHERE user_id = $1', [req.user.id]);

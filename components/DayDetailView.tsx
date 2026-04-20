@@ -7,11 +7,12 @@ import BetCard from './BetCard';
 interface DayDetailViewProps {
   date: string;
   settings: AppSettings;
+  botId?: string;
   onBack: () => void;
   onRestoreDate?: (date: string) => void;
 }
 
-const DayDetailView: React.FC<DayDetailViewProps> = ({ date, settings, onBack, onRestoreDate }) => {
+const DayDetailView: React.FC<DayDetailViewProps> = ({ date, settings, botId, onBack, onRestoreDate }) => {
   const [recap, setRecap] = useState<DailyRecap | null>(null);
   const [bets, setBets] = useState<Bet[]>([]);
   const [loading, setLoading] = useState(true);
@@ -20,7 +21,8 @@ const DayDetailView: React.FC<DayDetailViewProps> = ({ date, settings, onBack, o
     const load = async () => {
       setLoading(true);
       try {
-        const data = await recapsAPI.getDaily(date);
+        if (!botId) return;
+        const data = await recapsAPI.getDaily(date, botId);
         setRecap(data.recap);
         setBets(data.bets);
       } catch (err) {
