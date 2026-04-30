@@ -132,7 +132,15 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
     const pollBets = async () => {
       try {
         const betsData = await betsAPI.getAll(activeBot.id);
-        setBets(betsData);
+        setBets(prev => {
+          // Keep any locally-added bets created in the last 30s that the server
+          // hasn't acknowledged yet (race between optimistic add and poll).
+          const serverIds = new Set(betsData.map((b: Bet) => b.id));
+          const recentLocalOnly = prev.filter(
+            b => !serverIds.has(b.id) && (Date.now() - Number(b.timestamp)) < 30000
+          );
+          return [...recentLocalOnly, ...betsData];
+        });
       } catch (err) {
         console.error('Failed to refresh bets:', err);
       }
@@ -268,9 +276,15 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
       result: BetResult.PENDING,
       customScheduleTime: undefined,
     };
-    await betsAPI.create(copiedBet);
+    // Optimistic add — appears instantly, before server round-trip
     setBets(prev => [copiedBet, ...prev]);
     setScrollToBetId(copiedBet.id);
+    try {
+      await betsAPI.create(copiedBet);
+    } catch {
+      // Revert if save failed
+      setBets(prev => prev.filter(b => b.id !== copiedBet.id));
+    }
   };
 
   const clearAllBets = async () => {
@@ -298,8 +312,12 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
          isPosted: false,
          matchTimestamp: parseMatchTime('12:00 PM', slateDate, appSettings.slateTimezone)
      };
-     await betsAPI.create(newBet);
      setBets(prev => [newBet, ...prev]);
+     try {
+       await betsAPI.create(newBet);
+     } catch {
+       setBets(prev => prev.filter(b => b.id !== newBet.id));
+     }
   };
 
   const handleManualAddPosted = async () => {
@@ -320,9 +338,13 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
          isPosted: true,
          matchTimestamp: parseMatchTime('12:00 PM', slateDate, appSettings.slateTimezone)
      };
-     await betsAPI.create(newBet);
      setBets(prev => [newBet, ...prev]);
      setScrollToBetId(newBet.id);
+     try {
+       await betsAPI.create(newBet);
+     } catch {
+       setBets(prev => prev.filter(b => b.id !== newBet.id));
+     }
   };
 
   const handleScheduleAll = async () => {
