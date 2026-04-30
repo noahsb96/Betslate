@@ -124,7 +124,7 @@ export const startScheduler = () => {
               }
             }
 
-            console.log(`🔔 Auto-posting bet: ${row.playerA} vs ${row.playerB}`);
+            console.log(`🔔 Auto-posting bet: ${row.playerA} vs ${row.playerB} | id=${row.id} | bot_id=${row.bot_id} | webhook=${row.discordWebhookUrl}`);
             const success = await postToDiscord(row, row);
 
             if (success) {

@@ -90,6 +90,8 @@ router.put('/', async (req, res) => {
     const owned = await verifyBotOwnership(botId, req.user.id);
     if (!owned) return res.status(403).json({ error: 'Bot not found' });
 
+    console.log(`[SETTINGS SAVE] bot_id=${botId} webhook=${s.discordWebhookUrl}`);
+
     const result = await pool.query(
       `INSERT INTO settings (
         bot_id, user_id, "mentionString", "discordWebhookUrl", "recapWebhookUrl", "botName",
