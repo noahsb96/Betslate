@@ -123,11 +123,9 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
       // If settings were just loaded (not user-modified), skip saving
       if (isLoadingSettings.current) {
         isLoadingSettings.current = false;
-        console.log('[SETTINGS] Skipping auto-save (just loaded)');
         return;
       }
       if (appSettings !== DEFAULT_SETTINGS && activeBot) {
-        console.log(`[SETTINGS] Auto-saving for bot ${activeBot.id} webhook=${appSettings.discordWebhookUrl}`);
         try {
           await settingsAPI.update(activeBot.id, appSettings);
         } catch (err) {
@@ -394,8 +392,6 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
       return false;
     }
 
-    console.log(`[MANUAL POST] bot=${activeBot?.id} | webhook=${appSettings.discordWebhookUrl} | bet=${bet.id}`);
-
     let mentionContent = appSettings.mentionString || "";
     if (mentionContent && /^\d+$/.test(mentionContent.trim())) {
       mentionContent = `<@&${mentionContent.trim()}>`;
@@ -438,8 +434,8 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
       });
       
       if (response.ok) {
-        await betsAPI.update(bet.id, { isPosted: true, autoPost: false });
-        setBets(prev => prev.map(b => b.id === bet.id ? { ...b, isPosted: true, autoPost: false } : b));
+        await betsAPI.update(bet.id, { isPosted: true });
+        setBets(prev => prev.map(b => b.id === bet.id ? { ...b, isPosted: true } : b));
         return true;
       }
       return false;
