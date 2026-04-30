@@ -153,6 +153,38 @@ router.get('/verify-email', async (req, res) => {
   }
 });
 
+// POST /api/auth/resend-verification
+router.post('/resend-verification', authLimiter, async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'Email is required.' });
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const result = await pool.query(
+      'SELECT id, email_verified FROM users WHERE email = $1',
+      [normalizedEmail]
+    );
+    const user = result.rows[0];
+
+    // Always return success to prevent user enumeration
+    if (user && !user.email_verified) {
+      await pool.query('DELETE FROM email_verification_tokens WHERE user_id = $1', [user.id]);
+      const token = crypto.randomBytes(32).toString('hex');
+      const expires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      await pool.query(
+        'INSERT INTO email_verification_tokens (token, user_id, expires_at) VALUES ($1, $2, $3)',
+        [token, user.id, expires]
+      );
+      await sendVerificationEmail(normalizedEmail, token);
+    }
+
+    res.json({ message: 'If that email is registered and unverified, a new confirmation link has been sent.' });
+  } catch (err) {
+    console.error('Resend verification error:', err);
+    res.status(500).json({ error: 'Failed to resend verification email. Please try again.' });
+  }
+});
+
 // POST /api/auth/forgot-password
 router.post('/forgot-password', forgotLimiter, async (req, res) => {
   try {

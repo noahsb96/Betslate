@@ -16,6 +16,27 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showResend, setShowResend] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendMessage, setResendMessage] = useState<string | null>(null);
+
+  const handleResendVerification = async () => {
+    setResendLoading(true);
+    setResendMessage(null);
+    try {
+      const res = await fetch(`${import.meta.env.PROD ? '/api' : 'http://localhost:3001/api'}/auth/resend-verification`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
+      const data = await res.json();
+      setResendMessage(data.message || 'Verification email sent.');
+    } catch {
+      setResendMessage('Failed to resend. Please try again.');
+    } finally {
+      setResendLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,6 +49,9 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
       navigate('/');
     } catch (err: any) {
       setError(err.message);
+      if (err.message?.includes('verify your email')) {
+        setShowResend(true);
+      }
     } finally {
       setLoading(false);
     }
@@ -49,6 +73,24 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
           {error && (
             <div className="bg-red-500/10 border border-red-500 text-red-300 text-sm rounded p-3 mb-4">
               {error}
+              {showResend && (
+                <div className="mt-2">
+                  <button
+                    type="button"
+                    onClick={handleResendVerification}
+                    disabled={resendLoading}
+                    className="text-indigo-400 hover:text-indigo-300 underline text-sm disabled:opacity-60"
+                  >
+                    {resendLoading ? 'Sending...' : 'Resend verification email'}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {resendMessage && (
+            <div className="bg-green-500/10 border border-green-500 text-green-300 text-sm rounded p-3 mb-4">
+              {resendMessage}
             </div>
           )}
 
