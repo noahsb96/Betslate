@@ -84,6 +84,9 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
   const [newBotName, setNewBotName] = useState<string>('');
   const [showNewBotInput, setShowNewBotInput] = useState(false);
   const renamingInputRef = useRef<HTMLInputElement>(null);
+  // Prevents the settings auto-save from firing while we're loading settings
+  // for a different bot (which would overwrite the old bot's settings row).
+  const isLoadingSettings = useRef(false);
 
   useEffect(() => {
      const loadData = async () => {
@@ -103,6 +106,7 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
            settingsAPI.get(bot.id)
          ]);
          setBets(betsData);
+         isLoadingSettings.current = true;
          setAppSettings(settingsData);
        } catch (err) {
          console.error('Failed to load data:', err);
@@ -116,6 +120,11 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
 
   useEffect(() => {
     const saveSettings = async () => {
+      // If settings were just loaded (not user-modified), skip saving
+      if (isLoadingSettings.current) {
+        isLoadingSettings.current = false;
+        return;
+      }
       if (appSettings !== DEFAULT_SETTINGS && activeBot) {
         try {
           await settingsAPI.update(activeBot.id, appSettings);
@@ -446,6 +455,7 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
         settingsAPI.get(bot.id)
       ]);
       setBets(betsData);
+      isLoadingSettings.current = true;
       setAppSettings(settingsData);
     } catch (err) {
       console.error('Failed to load bot data:', err);
