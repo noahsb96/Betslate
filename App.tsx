@@ -264,7 +264,9 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
       id: uuidv4(),
       timestamp: Date.now(),
       autoPost: false,
-      result: bet.isPosted ? bet.result : BetResult.PENDING
+      isPosted: false,
+      result: BetResult.PENDING,
+      customScheduleTime: undefined,
     };
     await betsAPI.create(copiedBet);
     setBets(prev => [copiedBet, ...prev]);
