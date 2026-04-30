@@ -476,7 +476,9 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
     const timeB = b.customScheduleTime || (b.matchTimestamp ? b.matchTimestamp - (appSettings.scheduleOffsetMinutes * 60000) : 0);
     return timeA - timeB;
   });
-  const historyBets = bets.filter(b => b.isPosted && b.slateDate === slateDate);
+  const historyBets = bets
+    .filter(b => b.isPosted && b.slateDate === slateDate)
+    .sort((a, b) => Number(a.timestamp) - Number(b.timestamp));
 
   const filteredHistoryBets = historyBets.filter(bet => {
     if (historyFilter === 'all') return true;

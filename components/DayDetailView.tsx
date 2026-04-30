@@ -24,7 +24,7 @@ const DayDetailView: React.FC<DayDetailViewProps> = ({ date, settings, botId, on
         if (!botId) return;
         const data = await recapsAPI.getDaily(date, botId);
         setRecap(data.recap);
-        setBets(data.bets);
+        setBets((data.bets ?? []).slice().sort((a: Bet, b: Bet) => Number(a.timestamp) - Number(b.timestamp)));
       } catch (err) {
         console.error('Failed to load day detail:', err);
       } finally {

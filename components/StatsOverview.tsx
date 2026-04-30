@@ -76,6 +76,22 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({ bets, settings, slateDate
     units: parseFloat(leagueStats[league].toFixed(2))
   }));
 
+  // Unit size breakdown: net units grouped by unit size (1u, 1.5u, 3u, etc.)
+  const unitSizeStats: Record<string, number> = {};
+  finishedBets.forEach(bet => {
+    const key = `${bet.units}u`;
+    if (!unitSizeStats[key]) unitSizeStats[key] = 0;
+    if (bet.result === BetResult.WIN) unitSizeStats[key] += calculateProfit(bet.units, bet.odds);
+    if (bet.result === BetResult.LOSS) unitSizeStats[key] -= bet.units;
+  });
+
+  const unitSizeBarData = Object.keys(unitSizeStats)
+    .sort((a, b) => parseFloat(a) - parseFloat(b))
+    .map(size => ({
+      name: size,
+      units: parseFloat(unitSizeStats[size].toFixed(2))
+    }));
+
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
     if (recapScheduled && recapTime) {
@@ -429,6 +445,30 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({ bets, settings, slateDate
             </div>
         )}
       </div>
+
+      {unitSizeBarData.length > 0 && (
+        <div className="h-64 mt-8">
+          <h3 className="text-sm font-semibold text-gray-400 mb-2 text-center">Net Units by Unit Size</h3>
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={unitSizeBarData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#40444b" vertical={false} />
+              <XAxis dataKey="name" stroke="#9ca3af" fontSize={11} tick={{fill: '#9ca3af'}} />
+              <YAxis stroke="#9ca3af" fontSize={10} tick={{fill: '#9ca3af'}} />
+              <Tooltip
+                cursor={{fill: '#40444b', opacity: 0.3}}
+                contentStyle={{backgroundColor: '#202225', border: 'none', borderRadius: '8px'}}
+                itemStyle={{color: '#fff'}}
+                formatter={(value: number) => [`${value > 0 ? '+' : ''}${value}u`, 'Net Units']}
+              />
+              <Bar dataKey="units">
+                {unitSizeBarData.map((entry, index) => (
+                  <Cell key={`ubar-${index}`} fill={entry.units >= 0 ? '#22c55e' : '#ef4444'} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
     </div>
   );
 };
