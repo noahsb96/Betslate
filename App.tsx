@@ -438,8 +438,8 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
       });
       
       if (response.ok) {
-        await betsAPI.update(bet.id, { isPosted: true });
-        setBets(prev => prev.map(b => b.id === bet.id ? { ...b, isPosted: true } : b));
+        await betsAPI.update(bet.id, { isPosted: true, autoPost: false });
+        setBets(prev => prev.map(b => b.id === bet.id ? { ...b, isPosted: true, autoPost: false } : b));
         return true;
       }
       return false;
