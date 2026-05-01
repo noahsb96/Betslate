@@ -9,10 +9,11 @@ interface DayDetailViewProps {
   settings: AppSettings;
   botId?: string;
   onBack: () => void;
+  onCopy?: (bet: Bet) => void;
   onRestoreDate?: (date: string) => void;
 }
 
-const DayDetailView: React.FC<DayDetailViewProps> = ({ date, settings, botId, onBack, onRestoreDate }) => {
+const DayDetailView: React.FC<DayDetailViewProps> = ({ date, settings, botId, onBack, onCopy, onRestoreDate }) => {
   const [recap, setRecap] = useState<DailyRecap | null>(null);
   const [bets, setBets] = useState<Bet[]>([]);
   const [loading, setLoading] = useState(true);
@@ -153,7 +154,7 @@ const DayDetailView: React.FC<DayDetailViewProps> = ({ date, settings, botId, on
                   settings={settings}
                   onUpdate={async () => {}}
                   onDelete={async () => {}}
-                  onCopy={async () => {}}
+                  onCopy={onCopy ?? (() => {})}
                   onPostToDiscord={async () => false}
                   readOnly
                 />

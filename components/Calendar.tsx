@@ -13,6 +13,7 @@ type CalendarView = 'month' | 'monthly-stats' | 'yearly';
 interface CalendarProps {
   settings: AppSettings;
   botId?: string;
+  onCopy?: (bet: any) => void;
   onRestoreDate?: (date: string) => void;
 }
 
@@ -25,7 +26,7 @@ const SHORT_MONTH_NAMES = [
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
 ];
 
-const Calendar: React.FC<CalendarProps> = ({ settings, botId, onRestoreDate }) => {
+const Calendar: React.FC<CalendarProps> = ({ settings, botId, onCopy, onRestoreDate }) => {
   const today = new Date();
   const [view, setView] = useState<CalendarView>('month');
   const [year, setYear] = useState(today.getFullYear());
@@ -189,6 +190,7 @@ const Calendar: React.FC<CalendarProps> = ({ settings, botId, onRestoreDate }) =
         settings={settings}
         botId={botId}
         onBack={() => setSelectedDate(null)}
+        onCopy={onCopy}
         onRestoreDate={onRestoreDate}
       />
     );
