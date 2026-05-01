@@ -180,8 +180,7 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({ bets, settings, slateDate
             league,
             units: parseFloat((units as number).toFixed(2))
           }));
-          try {
-            await recapsAPI.saveDaily({
+          await recapsAPI.saveDaily({
               date: recapDate,
               wins,
               losses,
@@ -191,15 +190,17 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({ bets, settings, slateDate
               league_breakdown: leagueBD,
               botId
             });
-          } catch (saveErr) {
-            console.error('Failed to save recap snapshot:', saveErr);
-          }
         }
         
         alert("Recap sent and saved to calendar history!");
+
+        // Delete all finished (non-pending) bets for the recap date after recap is sent
+        const finishedToDelete = bets.filter(b => b.slateDate === recapDate && b.result !== BetResult.PENDING);
+        finishedToDelete.forEach(b => onDeleteBet(b.id));
     } catch(e) {
         console.error(e);
-        alert("Failed to send recap.");
+        const msg = e instanceof Error ? e.message : String(e);
+        alert(`Failed to send recap: ${msg}`);
     }
   };
 

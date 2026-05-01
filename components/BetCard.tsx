@@ -11,9 +11,11 @@ interface BetCardProps {
   onCopy?: (bet: Bet) => void;
   onPostToDiscord: (bet: Bet) => Promise<boolean>;
   readOnly?: boolean;
+  selected?: boolean;
+  onToggleSelect?: () => void;
 }
 
-const BetCard: React.FC<BetCardProps> = ({ bet, settings, onUpdate, onDelete, onCopy, onPostToDiscord, readOnly = false }) => {
+const BetCard: React.FC<BetCardProps> = ({ bet, settings, onUpdate, onDelete, onCopy, onPostToDiscord, readOnly = false, selected = false, onToggleSelect }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState(bet);
   const [isPosting, setIsPosting] = useState(false);
@@ -142,8 +144,15 @@ const BetCard: React.FC<BetCardProps> = ({ bet, settings, onUpdate, onDelete, on
   };
 
   return (
-    <div id={`bet-${bet.id}`} className={`relative flex flex-col mb-4 rounded-md border-l-4 ${getStatusColor(bet.result)} shadow-lg transition-all overflow-hidden`}>
-      
+    <div id={`bet-${bet.id}`} className={`relative flex flex-col mb-4 rounded-md border-l-4 ${getStatusColor(bet.result)} shadow-lg transition-all overflow-hidden ${selected ? 'ring-2 ring-indigo-500' : ''}`}>
+      {onToggleSelect && (
+        <button onClick={onToggleSelect}
+          className={`absolute top-2 right-2 z-10 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${selected ? 'bg-indigo-600 border-indigo-600' : 'bg-[#36393f] border-gray-500 hover:border-indigo-400'}`}
+          title={selected ? 'Deselect' : 'Select'}
+        >
+          {selected && <Check size={12} className="text-white" />}
+        </button>
+      )}
       <div className="flex items-center gap-1 sm:gap-2 md:gap-3 p-2 sm:p-3 md:p-4 bg-[#36393f] rounded-tr-md">
         {settings.botAvatarUrl ? (
           <img src={settings.botAvatarUrl} alt="Bot" className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover flex-shrink-0" />

@@ -106,6 +106,16 @@ export const initDatabase = async () => {
     )
   `);
   await pool.query(`ALTER TABLE daily_recaps ADD COLUMN IF NOT EXISTS bot_id UUID REFERENCES bots(id) ON DELETE CASCADE`);
+  // Drop the old per-user unique constraint (one recap per user per date) — replaced by per-bot constraint
+  await pool.query(`
+    DO $$ BEGIN
+      IF EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'daily_recaps_user_id_date_key'
+      ) THEN
+        ALTER TABLE daily_recaps DROP CONSTRAINT daily_recaps_user_id_date_key;
+      END IF;
+    END $$
+  `);
   // Add per-bot unique constraint (idempotent via DO block)
   await pool.query(`
     DO $$ BEGIN

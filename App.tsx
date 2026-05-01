@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
-import { Settings, RefreshCw, Trash, Plus, Calendar, Clock, Layers, FileText, X, LogOut, UserCircle, RotateCcw, Bot, Pencil, Check } from 'lucide-react';
+import { Settings, RefreshCw, Trash, Plus, Calendar, Clock, Layers, FileText, X, LogOut, UserCircle, RotateCcw, Bot, Pencil, Check, CheckSquare, Copy } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import Uploader from './components/Uploader';
 import BetCard from './components/BetCard';
@@ -83,6 +83,12 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
   const [renamingBotName, setRenamingBotName] = useState<string>('');
   const [newBotName, setNewBotName] = useState<string>('');
   const [showNewBotInput, setShowNewBotInput] = useState(false);
+
+  // ── Cross-bot copy selection ─────────────────────────────────────────────
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedBetIds, setSelectedBetIds] = useState<Set<string>>(new Set());
+  const [copyToBotId, setCopyToBotId] = useState<string>('');
+  const [showCopyBotPicker, setShowCopyBotPicker] = useState(false);
   const renamingInputRef = useRef<HTMLInputElement>(null);
   // Prevents the settings auto-save from firing while we're loading settings
   // for a different bot (which would overwrite the old bot's settings row).
@@ -321,6 +327,41 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
       await betsAPI.clearAll(undefined, activeBot?.id);
       setBets([]);
     }
+  };
+
+  const toggleSelectMode = (mode: boolean) => {
+    setSelectMode(mode);
+    setSelectedBetIds(new Set());
+    setShowCopyBotPicker(false);
+  };
+
+  const toggleBetSelection = (id: string) => {
+    setSelectedBetIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const handleCopySelectedToBot = async () => {
+    const targetBot = bots.find(b => b.id === copyToBotId);
+    if (!targetBot || selectedBetIds.size === 0) return;
+    const selectedBets = bets.filter(b => selectedBetIds.has(b.id));
+    const isHistoryContext = selectedBets.every(b => b.isPosted);
+    const copies = selectedBets.map(bet => ({
+      ...bet,
+      id: uuidv4(),
+      timestamp: Date.now(),
+      autoPost: false,
+      customScheduleTime: undefined,
+      // Keep isPosted/result/slateDate context consistent with source
+      isPosted: isHistoryContext ? bet.isPosted : false,
+      result: isHistoryContext ? bet.result : 'PENDING',
+      botId: targetBot.id,
+    }));
+    await Promise.all(copies.map(c => betsAPI.create(c).catch(console.error)));
+    alert(`${copies.length} play${copies.length > 1 ? 's' : ''} copied to ${targetBot.name}.`);
+    toggleSelectMode(false);
   };
   
   const handleManualAdd = async () => {
@@ -902,6 +943,39 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
             </div>
 
             <div className="space-y-2">
+              {/* Select toolbar */}
+              {queueBets.length > 0 && (
+                <div className="flex items-center gap-2 flex-wrap mb-1">
+                  {!selectMode ? (
+                    <button onClick={() => { toggleSelectMode(true); setCopyToBotId(bots.filter(b => b.id !== activeBot?.id)[0]?.id ?? ''); }}
+                      className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-[#2f3136] border border-gray-600 rounded hover:border-indigo-400 text-gray-400 hover:text-white transition-colors">
+                      <CheckSquare size={13}/> Select
+                    </button>
+                  ) : (
+                    <>
+                      <button onClick={() => setSelectedBetIds(selectedBetIds.size === queueBets.length ? new Set() : new Set(queueBets.map(b => b.id)))}
+                        className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-[#2f3136] border border-gray-600 rounded hover:border-white text-gray-300 hover:text-white transition-colors">
+                        <CheckSquare size={13}/> {selectedBetIds.size === queueBets.length ? 'Deselect All' : 'Select All'}
+                      </button>
+                      {selectedBetIds.size > 0 && (
+                        <div className="flex items-center gap-1.5">
+                          <select value={copyToBotId} onChange={e => setCopyToBotId(e.target.value)}
+                            className="text-xs bg-[#202225] border border-gray-600 rounded px-2 py-1.5 text-white focus:outline-none focus:border-indigo-400">
+                            {bots.filter(b => b.id !== activeBot?.id).map(b => (
+                              <option key={b.id} value={b.id}>{b.name}</option>
+                            ))}
+                          </select>
+                          <button onClick={handleCopySelectedToBot} disabled={!copyToBotId}
+                            className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 rounded text-white disabled:opacity-40 transition-colors">
+                            <Copy size={13}/> Copy {selectedBetIds.size} to Bot
+                          </button>
+                        </div>
+                      )}
+                      <button onClick={() => toggleSelectMode(false)} className="text-xs px-2 py-1.5 text-gray-400 hover:text-white">Cancel</button>
+                    </>
+                  )}
+                </div>
+              )}
               {queueBets.length === 0 ? (
                 <div className="text-center py-12 text-gray-500 border border-dashed border-gray-700 rounded-lg">
                    Queue is empty. Upload a slate or add a manual bet.
@@ -916,6 +990,8 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
                     onDelete={handleDeleteBet}
                     onCopy={handleCopyBet}
                     onPostToDiscord={handlePostToDiscord}
+                    selected={selectMode && selectedBetIds.has(bet.id)}
+                    onToggleSelect={selectMode ? () => toggleBetSelection(bet.id) : undefined}
                   />
                 ))
               )}
@@ -991,6 +1067,39 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
             </div>
 
             <div className="space-y-2">
+              {/* Select toolbar */}
+              {filteredHistoryBets.length > 0 && (
+                <div className="flex items-center gap-2 flex-wrap mb-1">
+                  {!selectMode ? (
+                    <button onClick={() => { toggleSelectMode(true); setCopyToBotId(bots.filter(b => b.id !== activeBot?.id)[0]?.id ?? ''); }}
+                      className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-[#2f3136] border border-gray-600 rounded hover:border-indigo-400 text-gray-400 hover:text-white transition-colors">
+                      <CheckSquare size={13}/> Select
+                    </button>
+                  ) : (
+                    <>
+                      <button onClick={() => setSelectedBetIds(selectedBetIds.size === filteredHistoryBets.length ? new Set() : new Set(filteredHistoryBets.map(b => b.id)))}
+                        className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-[#2f3136] border border-gray-600 rounded hover:border-white text-gray-300 hover:text-white transition-colors">
+                        <CheckSquare size={13}/> {selectedBetIds.size === filteredHistoryBets.length ? 'Deselect All' : 'Select All'}
+                      </button>
+                      {selectedBetIds.size > 0 && (
+                        <div className="flex items-center gap-1.5">
+                          <select value={copyToBotId} onChange={e => setCopyToBotId(e.target.value)}
+                            className="text-xs bg-[#202225] border border-gray-600 rounded px-2 py-1.5 text-white focus:outline-none focus:border-indigo-400">
+                            {bots.filter(b => b.id !== activeBot?.id).map(b => (
+                              <option key={b.id} value={b.id}>{b.name}</option>
+                            ))}
+                          </select>
+                          <button onClick={handleCopySelectedToBot} disabled={!copyToBotId}
+                            className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 rounded text-white disabled:opacity-40 transition-colors">
+                            <Copy size={13}/> Copy {selectedBetIds.size} to Bot
+                          </button>
+                        </div>
+                      )}
+                      <button onClick={() => toggleSelectMode(false)} className="text-xs px-2 py-1.5 text-gray-400 hover:text-white">Cancel</button>
+                    </>
+                  )}
+                </div>
+              )}
               {filteredHistoryBets.length === 0 ? (
                  <div className="text-center py-12 text-gray-500">
                     {historyFilter === 'all'
@@ -1008,6 +1117,8 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
                     onDelete={handleDeleteBet}
                     onCopy={handleCopyBetToHistory}
                     onPostToDiscord={handlePostToDiscord}
+                    selected={selectMode && selectedBetIds.has(bet.id)}
+                    onToggleSelect={selectMode ? () => toggleBetSelection(bet.id) : undefined}
                   />
                 ))
               )}

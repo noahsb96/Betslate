@@ -37,13 +37,18 @@ const Calendar: React.FC<CalendarProps> = ({ settings, botId, onCopy, onRestoreD
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // Clear selected date when bot changes so stale day details don't show
+  useEffect(() => {
+    setSelectedDate(null);
+  }, [botId]);
+
   useEffect(() => {
     if (view === 'month' || view === 'monthly-stats') {
       loadMonthData();
     } else if (view === 'yearly') {
       loadYearData();
     }
-  }, [view, year, month]);
+  }, [view, year, month, botId]);
 
   const loadMonthData = async () => {
     if (!botId) return;
@@ -287,10 +292,10 @@ const Calendar: React.FC<CalendarProps> = ({ settings, botId, onCopy, onRestoreD
                   return (
                     <div
                       key={dateStr}
-                      onClick={() => !isFuture && setSelectedDate(dateStr)}
+                      onClick={() => setSelectedDate(dateStr)}
                       className={`
                         relative min-h-[70px] p-1.5 rounded-lg border transition-all
-                        ${isFuture ? 'border-gray-800 opacity-30 cursor-default' : 'cursor-pointer hover:border-indigo-500'}
+                        ${isFuture ? 'border-gray-800 opacity-30' : 'cursor-pointer hover:border-indigo-500'}
                         ${isToday ? 'border-indigo-500 bg-indigo-900/20' : 'border-gray-700 bg-[#2f3136]'}
                         ${recap ? (recap.net_units >= 0 ? 'hover:bg-green-900/10' : 'hover:bg-red-900/10') : 'hover:bg-[#40444b]'}
                       `}
