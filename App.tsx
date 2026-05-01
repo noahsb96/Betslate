@@ -284,12 +284,13 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
       isPosted: false,
       result: BetResult.PENDING,
       customScheduleTime: undefined,
+      slateDate: slateDate,
     };
     // Optimistic add — appears instantly, before server round-trip
     setBets(prev => [copiedBet, ...prev]);
     setScrollToBetId(copiedBet.id);
     try {
-      await betsAPI.create(copiedBet);
+      await betsAPI.create({ ...copiedBet, botId: activeBot?.id });
     } catch {
       // Revert if save failed
       setBets(prev => prev.filter(b => b.id !== copiedBet.id));
