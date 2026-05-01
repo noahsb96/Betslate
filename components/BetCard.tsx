@@ -8,7 +8,7 @@ interface BetCardProps {
   settings: AppSettings;
   onUpdate: (id: string, updates: Partial<Bet>, shouldScroll?: boolean) => void;
   onDelete: (id: string) => void;
-  onCopy: (bet: Bet) => void;
+  onCopy?: (bet: Bet) => void;
   onPostToDiscord: (bet: Bet) => Promise<boolean>;
   readOnly?: boolean;
 }
@@ -274,7 +274,7 @@ const BetCard: React.FC<BetCardProps> = ({ bet, settings, onUpdate, onDelete, on
              }} className="p-1 sm:p-1.5 text-gray-400 hover:text-white hover:bg-gray-700 rounded"><Edit2 size={14}/></button>
           ) : null}
           
-          {!readOnly && (
+          {onCopy && (
           <button 
             onClick={() => onCopy(bet)}
             className="p-1 sm:p-1.5 text-purple-400 hover:text-white hover:bg-gray-700 rounded"

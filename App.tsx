@@ -987,7 +987,7 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
                     settings={appSettings}
                     onUpdate={handleUpdateBet}
                     onDelete={handleDeleteBet}
-                    onCopy={(b) => { handleCopyBet(b); setActiveTab('queue'); }}
+                    onCopy={handleCopyBet}
                     onPostToDiscord={handlePostToDiscord}
                   />
                 ))
@@ -1001,7 +1001,7 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
             <CalendarView
               settings={appSettings}
               botId={activeBot?.id}
-              onCopy={(bet) => { handleCopyBet(bet); setActiveTab('queue'); }}
+              onCopy={handleCopyBet}
               onRestoreDate={(date) => {
                 setSlateDate(date);
                 setRestoredDate(date);
