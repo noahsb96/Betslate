@@ -207,26 +207,27 @@ const Calendar: React.FC<CalendarProps> = ({ settings, botId, onCopy, onRestoreD
 
   return (
     <div className="text-white">
-      {/* View Toggle */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex gap-1 bg-[#202225] rounded-lg p-1">
+      {/* View Toggle + Navigation — stacked on mobile, side-by-side on sm+ */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+        <div className="flex gap-1 bg-[#202225] rounded-lg p-1 self-start">
           <button
             onClick={() => setView('month')}
-            className={`flex items-center px-3 py-1.5 rounded text-sm font-medium transition-colors ${view === 'month' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'}`}
+            className={`flex items-center px-2 sm:px-3 py-1.5 rounded text-xs sm:text-sm font-medium transition-colors ${view === 'month' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'}`}
           >
-            <CalendarDays size={14} className="mr-1.5" /> Month
+            <CalendarDays size={13} className="mr-1 sm:mr-1.5" /> Month
           </button>
           <button
             onClick={() => setView('monthly-stats')}
-            className={`flex items-center px-3 py-1.5 rounded text-sm font-medium transition-colors ${view === 'monthly-stats' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'}`}
+            className={`flex items-center px-2 sm:px-3 py-1.5 rounded text-xs sm:text-sm font-medium transition-colors ${view === 'monthly-stats' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'}`}
           >
-            <BarChart2 size={14} className="mr-1.5" /> Monthly Stats
+            <BarChart2 size={13} className="mr-1 sm:mr-1.5" />
+            <span className="hidden sm:inline">Monthly </span>Stats
           </button>
           <button
             onClick={() => setView('yearly')}
-            className={`flex items-center px-3 py-1.5 rounded text-sm font-medium transition-colors ${view === 'yearly' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'}`}
+            className={`flex items-center px-2 sm:px-3 py-1.5 rounded text-xs sm:text-sm font-medium transition-colors ${view === 'yearly' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'}`}
           >
-            <TrendingUp size={14} className="mr-1.5" /> Yearly
+            <TrendingUp size={13} className="mr-1 sm:mr-1.5" /> Yearly
           </button>
         </div>
 
@@ -238,7 +239,7 @@ const Calendar: React.FC<CalendarProps> = ({ settings, botId, onCopy, onRestoreD
             </button>
           )}
           {view !== 'yearly' && (
-            <span className="font-semibold text-white min-w-[140px] text-center">
+            <span className="font-semibold text-white min-w-[120px] sm:min-w-[140px] text-center text-sm sm:text-base">
               {MONTH_NAMES[month - 1]} {year}
             </span>
           )}
@@ -270,9 +271,10 @@ const Calendar: React.FC<CalendarProps> = ({ settings, botId, onCopy, onRestoreD
             <div>
               {/* Day-of-week headers */}
               <div className="grid grid-cols-7 mb-1">
-                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
-                  <div key={d} className="text-center text-xs text-gray-500 font-semibold py-2 uppercase">
-                    {d}
+                {[['S','Sun'], ['M','Mon'], ['T','Tue'], ['W','Wed'], ['T','Thu'], ['F','Fri'], ['S','Sat']].map(([short, full]) => (
+                  <div key={full} className="text-center text-xs text-gray-500 font-semibold py-2 uppercase">
+                    <span className="sm:hidden">{short}</span>
+                    <span className="hidden sm:inline">{full}</span>
                   </div>
                 ))}
               </div>
@@ -294,7 +296,7 @@ const Calendar: React.FC<CalendarProps> = ({ settings, botId, onCopy, onRestoreD
                       key={dateStr}
                       onClick={() => setSelectedDate(dateStr)}
                       className={`
-                        relative min-h-[70px] p-1.5 rounded-lg border transition-all
+                        relative min-h-[52px] sm:min-h-[70px] p-1 sm:p-1.5 rounded-lg border transition-all
                         ${isFuture ? 'border-gray-800 opacity-30' : 'cursor-pointer hover:border-indigo-500'}
                         ${isToday ? 'border-indigo-500 bg-indigo-900/20' : 'border-gray-700 bg-[#2f3136]'}
                         ${recap ? (recap.net_units >= 0 ? 'hover:bg-green-900/10' : 'hover:bg-red-900/10') : 'hover:bg-[#40444b]'}

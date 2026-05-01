@@ -593,7 +593,7 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
                 BS
              </div>
             <div>
-              <h1 className="text-xl font-bold text-white leading-tight">BetSlate AI Automator</h1>
+              <h1 className="text-base sm:text-xl font-bold text-white leading-tight">BetSlate AI Automator</h1>
             </div>
           </div>
           <div className="flex items-center space-x-2">
@@ -884,24 +884,29 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
           </div>
         )}
 
-        <div className="flex space-x-2 mb-6 border-b border-gray-700 pb-1 overflow-x-auto">
+        <div className="flex mb-6 border-b border-gray-700 pb-1">
           <button 
             onClick={() => setActiveTab('queue')}
-            className={`flex items-center px-3 md:px-4 py-2 font-medium transition-all rounded-t-lg whitespace-nowrap ${activeTab === 'queue' ? 'bg-[#2f3136] text-white border-t border-l border-r border-gray-600' : 'text-gray-400 hover:text-white hover:bg-[#2f3136]/50'}`}
+            className={`flex items-center gap-1 px-2 sm:px-4 py-2 text-sm font-medium transition-all rounded-t-lg whitespace-nowrap flex-1 justify-center sm:flex-none sm:justify-start ${activeTab === 'queue' ? 'bg-[#2f3136] text-white border-t border-l border-r border-gray-600' : 'text-gray-400 hover:text-white hover:bg-[#2f3136]/50'}`}
           >
-            <Layers size={16} className="mr-1 md:mr-2"/> Queue ({queueBets.length})
+            <Layers size={15} className="flex-shrink-0"/>
+            <span className="hidden xs:inline sm:inline">Queue</span>
+            <span className="text-xs">({queueBets.length})</span>
           </button>
           <button 
             onClick={() => setActiveTab('history')}
-            className={`flex items-center px-3 md:px-4 py-2 font-medium transition-all rounded-t-lg whitespace-nowrap ${activeTab === 'history' ? 'bg-[#2f3136] text-white border-t border-l border-r border-gray-600' : 'text-gray-400 hover:text-white hover:bg-[#2f3136]/50'}`}
+            className={`flex items-center gap-1 px-2 sm:px-4 py-2 text-sm font-medium transition-all rounded-t-lg whitespace-nowrap flex-1 justify-center sm:flex-none sm:justify-start ${activeTab === 'history' ? 'bg-[#2f3136] text-white border-t border-l border-r border-gray-600' : 'text-gray-400 hover:text-white hover:bg-[#2f3136]/50'}`}
           >
-            <FileText size={16} className="mr-1 md:mr-2"/> History & Stats ({historyBets.length})
+            <FileText size={15} className="flex-shrink-0"/>
+            <span className="hidden sm:inline">History &amp; Stats</span>
+            <span className="sm:hidden">History</span>
+            <span className="text-xs">({historyBets.length})</span>
           </button>
           <button
             onClick={() => setActiveTab('calendar')}
-            className={`flex items-center px-3 md:px-4 py-2 font-medium transition-all rounded-t-lg whitespace-nowrap ${activeTab === 'calendar' ? 'bg-[#2f3136] text-white border-t border-l border-r border-gray-600' : 'text-gray-400 hover:text-white hover:bg-[#2f3136]/50'}`}
+            className={`flex items-center gap-1 px-2 sm:px-4 py-2 text-sm font-medium transition-all rounded-t-lg whitespace-nowrap flex-1 justify-center sm:flex-none sm:justify-start ${activeTab === 'calendar' ? 'bg-[#2f3136] text-white border-t border-l border-r border-gray-600' : 'text-gray-400 hover:text-white hover:bg-[#2f3136]/50'}`}
           >
-            <Calendar size={16} className="mr-1 md:mr-2"/> Calendar
+            <Calendar size={15} className="flex-shrink-0"/> Calendar
           </button>
         </div>
 
