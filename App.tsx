@@ -297,6 +297,25 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
     }
   };
 
+  // Copy within history/recap — stays posted with the original slateDate
+  const handleCopyBetToHistory = async (bet: Bet) => {
+    const copiedBet: Bet = {
+      ...bet,
+      id: uuidv4(),
+      timestamp: Date.now(),
+      autoPost: false,
+      isPosted: true,
+      result: BetResult.PENDING,
+      customScheduleTime: undefined,
+    };
+    setBets(prev => [copiedBet, ...prev]);
+    try {
+      await betsAPI.create({ ...copiedBet, botId: activeBot?.id });
+    } catch {
+      setBets(prev => prev.filter(b => b.id !== copiedBet.id));
+    }
+  };
+
   const clearAllBets = async () => {
     if (window.confirm(`Clear all bets in the queue? This cannot be undone.`)) {
       await betsAPI.clearAll(undefined, activeBot?.id);
@@ -987,7 +1006,7 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
                     settings={appSettings}
                     onUpdate={handleUpdateBet}
                     onDelete={handleDeleteBet}
-                    onCopy={handleCopyBet}
+                    onCopy={handleCopyBetToHistory}
                     onPostToDiscord={handlePostToDiscord}
                   />
                 ))
@@ -1001,7 +1020,7 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
             <CalendarView
               settings={appSettings}
               botId={activeBot?.id}
-              onCopy={handleCopyBet}
+              onCopy={handleCopyBetToHistory}
               onRestoreDate={(date) => {
                 setSlateDate(date);
                 setRestoredDate(date);
