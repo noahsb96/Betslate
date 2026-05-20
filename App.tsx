@@ -289,7 +289,6 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
       autoPost: false,
       isPosted: false,
       result: BetResult.PENDING,
-      customScheduleTime: undefined,
       slateDate: slateDate,
     };
     // Optimistic add — appears instantly, before server round-trip
@@ -312,7 +311,6 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
       autoPost: false,
       isPosted: true,
       result: BetResult.PENDING,
-      customScheduleTime: undefined,
     };
     setBets(prev => [copiedBet, ...prev]);
     try {
@@ -353,7 +351,6 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
       id: uuidv4(),
       timestamp: Date.now(),
       autoPost: false,
-      customScheduleTime: undefined,
       // Keep isPosted/result/slateDate context consistent with source
       isPosted: isHistoryContext ? bet.isPosted : false,
       result: isHistoryContext ? bet.result : 'PENDING',
