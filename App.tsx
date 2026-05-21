@@ -19,6 +19,13 @@ import { betsAPI, settingsAPI, botsAPI } from './services/api';
 import { authAPI, getToken, clearToken } from './services/authAPI';
 import { Bet, BetResult, AppSettings, User, Bot as BotType } from './types';
 
+// Returns today's date in YYYY-MM-DD using the browser's local timezone,
+// not UTC (which can be a day ahead for users in timezones behind UTC).
+const getLocalDateString = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
 const DEFAULT_SETTINGS: AppSettings = {
     mentionString: '@Chefs Plays',
     discordWebhookUrl: '',
@@ -71,7 +78,7 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'queue' | 'history' | 'calendar'>('queue');
   const [historyFilter, setHistoryFilter] = useState<'all' | 'pending' | 'won' | 'lost' | 'push'>('all');
-  const [slateDate, setSlateDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [slateDate, setSlateDate] = useState<string>(getLocalDateString());
   const [restoredDate, setRestoredDate] = useState<string | null>(null);
   const [appSettings, setAppSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [scrollToBetId, setScrollToBetId] = useState<string | null>(null);
@@ -289,7 +296,7 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
       autoPost: false,
       isPosted: false,
       result: BetResult.PENDING,
-      slateDate: slateDate,
+      slateDate: bet.slateDate,
     };
     // Optimistic add — appears instantly, before server round-trip
     setBets(prev => [copiedBet, ...prev]);
@@ -1019,7 +1026,7 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
                   <button
                     onClick={() => {
                       setRestoredDate(null);
-                      setSlateDate(new Date().toISOString().split('T')[0]);
+                      setSlateDate(getLocalDateString());
                     }}
                     className="text-gray-400 hover:text-white underline"
                   >
