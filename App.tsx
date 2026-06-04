@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
-import { Settings, RefreshCw, Trash, Plus, Calendar, Clock, Layers, FileText, X, LogOut, UserCircle, RotateCcw, Bot, Pencil, Check, CheckSquare, Copy } from 'lucide-react';
+import { Settings, RefreshCw, Trash, Plus, Calendar, Clock, Layers, FileText, X, LogOut, UserCircle, RotateCcw, Bot, Pencil, Check, CheckSquare, Copy, Link2, MessageSquare } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import Uploader from './components/Uploader';
 import BetCard from './components/BetCard';
@@ -15,9 +15,10 @@ import VerifyEmailPage from './components/auth/VerifyEmailPage';
 import AccountPage from './components/auth/AccountPage';
 import ConfirmEmailChangePage from './components/auth/ConfirmEmailChangePage';
 import { analyzeSlateImage } from './services/geminiService';
-import { betsAPI, settingsAPI, botsAPI } from './services/api';
+import { betsAPI, settingsAPI, botsAPI, betLinksAPI, messagesAPI } from './services/api';
 import { authAPI, getToken, clearToken } from './services/authAPI';
-import { Bet, BetResult, AppSettings, User, Bot as BotType } from './types';
+import { Bet, BetResult, AppSettings, BetLink, User, Bot as BotType } from './types';
+import ScheduledMessages from './components/ScheduledMessages';
 
 // Returns today's date in YYYY-MM-DD using the browser's local timezone,
 // not UTC (which can be a day ahead for users in timezones behind UTC).
@@ -44,6 +45,8 @@ const DEFAULT_SETTINGS: AppSettings = {
     defaultBetAlertTitle: '📢 Bet Alert',
     betEmbedColor: 16731469,
     recapEmbedColor: 16731469,
+    mentionRoles: [],
+    leagueRoleMappings: [],
     aiInstructions: `You are an expert sports betting assistant specialized in Table Tennis.
 Your task is to analyze an image of a betting slate and extract the structured betting data.
 
@@ -76,7 +79,7 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
   const [loading, setLoading] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'queue' | 'history' | 'calendar'>('queue');
+  const [activeTab, setActiveTab] = useState<'queue' | 'history' | 'calendar' | 'messages'>('queue');
   const [historyFilter, setHistoryFilter] = useState<'all' | 'pending' | 'won' | 'lost' | 'push'>('all');
   const [slateDate, setSlateDate] = useState<string>(getLocalDateString());
   const [restoredDate, setRestoredDate] = useState<string | null>(null);
@@ -97,6 +100,13 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
   const [copyToBotId, setCopyToBotId] = useState<string>('');
   const [showCopyBotPicker, setShowCopyBotPicker] = useState(false);
   const renamingInputRef = useRef<HTMLInputElement>(null);
+
+  // ── Bet link modal state ──────────────────────────────────────────────────────────
+  const [linkingBet, setLinkingBet] = useState<Bet | null>(null);
+  const [linkSuggestions, setLinkSuggestions] = useState<any[]>([]);
+  const [existingLinks, setExistingLinks] = useState<BetLink[]>([]);
+  // ── Grade sync prompts ───────────────────────────────────────────────────────────────
+  const [gradeSyncPrompts, setGradeSyncPrompts] = useState<Array<BetLink & { pendingResult: BetResult }>>([]);
   // Prevents the settings auto-save from firing while we're loading settings
   // for a different bot (which would overwrite the old bot's settings row).
   const isLoadingSettings = useRef(false);
@@ -457,16 +467,29 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
       return false;
     }
 
-    let mentionContent = appSettings.mentionString || "";
-    if (mentionContent && /^\d+$/.test(mentionContent.trim())) {
-      mentionContent = `<@&${mentionContent.trim()}>`;
-    }
+    const resolveMentionContent = (league: string): { content: string; roleIds: string[] } => {
+      const roles = appSettings.mentionRoles || [];
+      const mappings = appSettings.leagueRoleMappings || [];
+      const leagueMapping = mappings.find(m => m.league === league);
+      let selectedRoles: Array<{id: string; name: string}>;
+      if (leagueMapping) {
+        selectedRoles = [{ id: leagueMapping.roleId, name: leagueMapping.roleName }];
+      } else if (roles.length > 0) {
+        selectedRoles = roles;
+      } else {
+        let content = appSettings.mentionString || '';
+        if (content && /^\d+$/.test(content.trim())) content = `<@&${content.trim()}>`;
+        const roleIds: string[] = [];
+        for (const m of content.matchAll(/<@&(\d+)>/g)) roleIds.push(m[1]);
+        return { content, roleIds };
+      }
+      return {
+        content: selectedRoles.map(r => `<@&${r.id}>`).join(' '),
+        roleIds: selectedRoles.map(r => r.id)
+      };
+    };
 
-    const roleIds: string[] = [];
-    const roleMatches = mentionContent.matchAll(/<@&(\d+)>/g);
-    for (const match of roleMatches) {
-      roleIds.push(match[1]);
-    }
+    const { content: mentionContent, roleIds } = resolveMentionContent(bet.league);
 
     const payload = {
       username: appSettings.botName || "AI BetSlate Automator",
@@ -567,6 +590,33 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
       }
     } catch (err: any) {
       alert(err.message || 'Failed to delete bot');
+    }
+  };
+
+  const handleGradeChange = async (bet: Bet, result: BetResult) => {
+    await handleUpdateBet(bet.id, { result });
+    if (result === BetResult.PENDING) return;
+    try {
+      const links: BetLink[] = await betLinksAPI.getLinks(bet.id);
+      if (links.length > 0) {
+        setGradeSyncPrompts(links.map(link => ({ ...link, pendingResult: result })));
+      }
+    } catch (e) {
+      console.error('Failed to fetch bet links for grade sync:', e);
+    }
+  };
+
+  const handleOpenLinkModal = async (bet: Bet) => {
+    setLinkingBet(bet);
+    try {
+      const [suggestions, links] = await Promise.all([
+        betLinksAPI.getSuggestions(bet.id),
+        betLinksAPI.getLinks(bet.id)
+      ]);
+      setLinkSuggestions(suggestions);
+      setExistingLinks(links as BetLink[]);
+    } catch (e) {
+      console.error('Failed to fetch link data:', e);
     }
   };
 
@@ -737,16 +787,127 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
                  <p className="text-xs text-gray-500 mt-1">Name shown in Discord messages and bet cards</p>
                </div>
 
-               <div>
-                 <label className="block text-sm text-gray-400 mb-1">Role to Mention (Role ID)</label>
-                 <input 
-                   type="text" 
-                   value={appSettings.mentionString}
-                   onChange={(e) => setAppSettings({...appSettings, mentionString: e.target.value})}
-                   placeholder="1456488731832750141"
-                   className="w-full bg-[#202225] border border-gray-700 rounded p-2 text-white focus:outline-none focus:border-blue-500"
-                 />
-                 <p className="text-xs text-gray-500 mt-1">Right-click role → Copy Role ID in Discord</p>
+               <div className="space-y-4">
+                 <div>
+                   <div className="flex items-center justify-between mb-2">
+                     <label className="text-sm font-medium text-gray-300">Default Roles to Mention</label>
+                     <button
+                       type="button"
+                       onClick={() => setAppSettings({ ...appSettings, mentionRoles: [...(appSettings.mentionRoles || []), { id: '', name: '' }] })}
+                       className="text-xs px-2 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded"
+                     >+ Add Role</button>
+                   </div>
+                   {(appSettings.mentionRoles || []).length === 0 && (
+                     <p className="text-xs text-gray-500 italic">No roles configured. Add a role or use the legacy field below.</p>
+                   )}
+                   <div className="space-y-2">
+                     {(appSettings.mentionRoles || []).map((role, idx) => (
+                       <div key={idx} className="flex items-center gap-2">
+                         <input
+                           type="text"
+                           placeholder="Display name (e.g. Chefs Plays)"
+                           value={role.name}
+                           onChange={e => {
+                             const updated = [...(appSettings.mentionRoles || [])];
+                             updated[idx] = { ...updated[idx], name: e.target.value };
+                             setAppSettings({ ...appSettings, mentionRoles: updated });
+                           }}
+                           className="flex-1 bg-[#202225] border border-gray-700 rounded p-2 text-white text-sm focus:outline-none focus:border-blue-500"
+                         />
+                         <input
+                           type="text"
+                           placeholder="Role ID"
+                           value={role.id}
+                           onChange={e => {
+                             const updated = [...(appSettings.mentionRoles || [])];
+                             updated[idx] = { ...updated[idx], id: e.target.value };
+                             setAppSettings({ ...appSettings, mentionRoles: updated });
+                           }}
+                           className="w-36 bg-[#202225] border border-gray-700 rounded p-2 text-white text-sm focus:outline-none focus:border-blue-500"
+                         />
+                         <button
+                           type="button"
+                           onClick={() => setAppSettings({ ...appSettings, mentionRoles: (appSettings.mentionRoles || []).filter((_, i) => i !== idx) })}
+                           className="p-2 text-red-400 hover:text-red-200"
+                         ><X size={14}/></button>
+                       </div>
+                     ))}
+                   </div>
+                   <p className="text-xs text-gray-500 mt-1">Right-click a role in Discord → Copy Role ID</p>
+                 </div>
+
+                 <div>
+                   <div className="flex items-center justify-between mb-2">
+                     <label className="text-sm font-medium text-gray-300">League-Specific Role Overrides</label>
+                     <button
+                       type="button"
+                       onClick={() => setAppSettings({ ...appSettings, leagueRoleMappings: [...(appSettings.leagueRoleMappings || []), { league: 'TT Elite Series', roleId: '', roleName: '' }] })}
+                       className="text-xs px-2 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded"
+                     >+ Add Mapping</button>
+                   </div>
+                   {(appSettings.leagueRoleMappings || []).length === 0 && (
+                     <p className="text-xs text-gray-500 italic">When set, a league's mapped role replaces the default roles for that league's alerts.</p>
+                   )}
+                   <div className="space-y-2">
+                     {(appSettings.leagueRoleMappings || []).map((mapping, idx) => (
+                       <div key={idx} className="flex items-center gap-2 flex-wrap">
+                         <select
+                           value={mapping.league}
+                           onChange={e => {
+                             const updated = [...(appSettings.leagueRoleMappings || [])];
+                             updated[idx] = { ...updated[idx], league: e.target.value };
+                             setAppSettings({ ...appSettings, leagueRoleMappings: updated });
+                           }}
+                           className="bg-[#202225] border border-gray-700 rounded p-2 text-white text-sm focus:outline-none focus:border-blue-500"
+                         >
+                           <option>TT Elite Series</option>
+                           <option>TT Cup</option>
+                           <option>Czech Liga Pro</option>
+                           <option>Setka Cup</option>
+                         </select>
+                         <input
+                           type="text"
+                           placeholder="Role name"
+                           value={mapping.roleName}
+                           onChange={e => {
+                             const updated = [...(appSettings.leagueRoleMappings || [])];
+                             updated[idx] = { ...updated[idx], roleName: e.target.value };
+                             setAppSettings({ ...appSettings, leagueRoleMappings: updated });
+                           }}
+                           className="flex-1 min-w-0 bg-[#202225] border border-gray-700 rounded p-2 text-white text-sm focus:outline-none focus:border-blue-500"
+                         />
+                         <input
+                           type="text"
+                           placeholder="Role ID"
+                           value={mapping.roleId}
+                           onChange={e => {
+                             const updated = [...(appSettings.leagueRoleMappings || [])];
+                             updated[idx] = { ...updated[idx], roleId: e.target.value };
+                             setAppSettings({ ...appSettings, leagueRoleMappings: updated });
+                           }}
+                           className="w-36 bg-[#202225] border border-gray-700 rounded p-2 text-white text-sm focus:outline-none focus:border-blue-500"
+                         />
+                         <button
+                           type="button"
+                           onClick={() => setAppSettings({ ...appSettings, leagueRoleMappings: (appSettings.leagueRoleMappings || []).filter((_, i) => i !== idx) })}
+                           className="p-2 text-red-400 hover:text-red-200"
+                         ><X size={14}/></button>
+                       </div>
+                     ))}
+                   </div>
+                 </div>
+
+                 <div>
+                   <label className="block text-sm text-gray-400 mb-1">Legacy Role to Mention (Role ID)</label>
+                   <input
+                     type="text"
+                     value={appSettings.mentionString}
+                     onChange={(e) => setAppSettings({...appSettings, mentionString: e.target.value})}
+                     placeholder="1456488731832750141"
+                     className="w-full bg-[#202225] border border-gray-700 rounded p-2 text-white focus:outline-none focus:border-blue-500"
+                   />
+                   <p className="text-xs text-gray-500 mt-1">Used as fallback when no roles are configured above</p>
+                 </div>
                </div>
 
                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -911,6 +1072,12 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
             className={`flex items-center gap-1 px-2 sm:px-4 py-2 text-sm font-medium transition-all rounded-t-lg whitespace-nowrap flex-1 justify-center sm:flex-none sm:justify-start ${activeTab === 'calendar' ? 'bg-[#2f3136] text-white border-t border-l border-r border-gray-600' : 'text-gray-400 hover:text-white hover:bg-[#2f3136]/50'}`}
           >
             <Calendar size={15} className="flex-shrink-0"/> Calendar
+          </button>
+          <button
+            onClick={() => setActiveTab('messages')}
+            className={`flex items-center gap-1 px-2 sm:px-4 py-2 text-sm font-medium transition-all rounded-t-lg whitespace-nowrap flex-1 justify-center sm:flex-none sm:justify-start ${activeTab === 'messages' ? 'bg-[#2f3136] text-white border-t border-l border-r border-gray-600' : 'text-gray-400 hover:text-white hover:bg-[#2f3136]/50'}`}
+          >
+            <MessageSquare size={15} className="flex-shrink-0"/> Messages
           </button>
         </div>
 
@@ -1126,6 +1293,8 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
                     onDelete={handleDeleteBet}
                     onCopy={handleCopyBetToHistory}
                     onPostToDiscord={handlePostToDiscord}
+                    onLink={handleOpenLinkModal}
+                    onGradeChange={handleGradeChange}
                     selected={selectMode && selectedBetIds.has(bet.id)}
                     onToggleSelect={selectMode ? () => toggleBetSelection(bet.id) : undefined}
                   />
@@ -1147,6 +1316,120 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
                 setActiveTab('history');
               }}
             />
+          </div>
+        )}
+
+        {activeTab === 'messages' && activeBot && (
+          <div className="bg-[#2f3136] rounded-lg p-4 md:p-6 shadow-lg">
+            <ScheduledMessages botId={activeBot.id} settings={appSettings} />
+          </div>
+        )}
+
+        {/* Link Modal */}
+        {linkingBet && (
+          <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setLinkingBet(null)}>
+            <div className="bg-[#2f3136] rounded-lg border border-gray-700 w-full max-w-md p-4 shadow-xl" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <Link2 size={15}/> Link Play to Another Bot
+                </h3>
+                <button onClick={() => setLinkingBet(null)} className="text-gray-400 hover:text-white"><X size={16}/></button>
+              </div>
+              <div className="text-xs text-gray-400 mb-4 bg-[#202225] p-2 rounded">
+                <span className="text-white font-medium">{linkingBet.playerA} vs {linkingBet.playerB}</span>
+                <span className="ml-2 text-gray-500">{linkingBet.league} · {linkingBet.slateDate}</span>
+              </div>
+              {existingLinks.length > 0 && (
+                <div className="mb-4">
+                  <div className="text-xs font-semibold text-gray-300 mb-2 uppercase tracking-wide">Linked Plays</div>
+                  <div className="space-y-1">
+                    {existingLinks.map(link => (
+                      <div key={link.id} className="flex items-center justify-between bg-[#202225] p-2 rounded text-xs">
+                        <span className="text-gray-300">
+                          <span className="text-indigo-400 font-medium">{link.linkedBotName}</span>: {link.linkedPlayerA} vs {link.linkedPlayerB}
+                        </span>
+                        <button
+                          onClick={async () => {
+                            await betLinksAPI.deleteLink(link.id);
+                            setExistingLinks(prev => prev.filter(l => l.id !== link.id));
+                          }}
+                          className="text-red-400 hover:text-red-200 ml-2"
+                          title="Unlink"
+                        ><X size={12}/></button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div>
+                <div className="text-xs font-semibold text-gray-300 mb-2 uppercase tracking-wide">
+                  {linkSuggestions.length > 0 ? 'Matching Plays on Other Bots' : 'No automatic matches found'}
+                </div>
+                {linkSuggestions.length > 0 ? (
+                  <div className="space-y-1">
+                    {linkSuggestions.map((s: any) => (
+                      <div key={s.id} className="flex items-center justify-between bg-[#202225] p-2 rounded text-xs">
+                        <span className="text-gray-300">
+                          <span className="text-indigo-400 font-medium">{s.botName}</span>: {s.playerA} vs {s.playerB}
+                          <span className="text-gray-500 ml-1">{s.slateDate}</span>
+                        </span>
+                        <button
+                          onClick={async () => {
+                            if (!linkingBet) return;
+                            await betLinksAPI.createLink(linkingBet.id, s.id);
+                            const [newSuggestions, newLinks] = await Promise.all([
+                              betLinksAPI.getSuggestions(linkingBet.id),
+                              betLinksAPI.getLinks(linkingBet.id)
+                            ]);
+                            setLinkSuggestions(newSuggestions);
+                            setExistingLinks(newLinks as BetLink[]);
+                          }}
+                          className="px-2 py-0.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded ml-2"
+                        >Link</button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-500 italic">
+                    No plays on other bots with the same league, players, and type were found.
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Grade Sync Toast */}
+        {gradeSyncPrompts.length > 0 && (
+          <div className="fixed bottom-6 right-6 z-50 bg-[#2f3136] border border-indigo-500 rounded-lg p-4 shadow-2xl max-w-sm w-full">
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-sm font-bold text-white">Sync grade to linked bot?</h4>
+              <button onClick={() => setGradeSyncPrompts([])} className="text-gray-400 hover:text-white"><X size={14}/></button>
+            </div>
+            <div className="space-y-2">
+              {gradeSyncPrompts.map((prompt, idx) => (
+                <div key={prompt.id} className="bg-[#202225] rounded p-2">
+                  <div className="text-xs text-gray-300 mb-1.5">
+                    <span className="text-indigo-400 font-medium">{prompt.linkedBotName}</span>: {prompt.linkedPlayerA} vs {prompt.linkedPlayerB}
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={async () => {
+                        await betsAPI.update(prompt.linkedBetId, { result: prompt.pendingResult });
+                        setGradeSyncPrompts(prev => prev.filter((_, i) => i !== idx));
+                      }}
+                      className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs rounded font-medium"
+                    >
+                      Sync {prompt.pendingResult}
+                    </button>
+                    <button
+                      onClick={() => setGradeSyncPrompts(prev => prev.filter((_, i) => i !== idx))}
+                      className="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs rounded"
+                    >Skip</button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 

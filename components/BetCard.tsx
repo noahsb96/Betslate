@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Bet, BetResult, AppSettings } from '../types';
-import { Check, X, Clock, Edit2, Trash2, Save, Send, Loader2, CalendarClock, Settings2, ExternalLink, Copy } from 'lucide-react';
+import { Check, X, Clock, Edit2, Trash2, Save, Send, Loader2, CalendarClock, Settings2, ExternalLink, Copy, Link2 } from 'lucide-react';
 
 interface BetCardProps {
   bet: Bet;
@@ -13,9 +13,11 @@ interface BetCardProps {
   readOnly?: boolean;
   selected?: boolean;
   onToggleSelect?: () => void;
+  onLink?: (bet: Bet) => void;
+  onGradeChange?: (bet: Bet, result: BetResult) => void;
 }
 
-const BetCard: React.FC<BetCardProps> = ({ bet, settings, onUpdate, onDelete, onCopy, onPostToDiscord, readOnly = false, selected = false, onToggleSelect }) => {
+const BetCard: React.FC<BetCardProps> = ({ bet, settings, onUpdate, onDelete, onCopy, onPostToDiscord, readOnly = false, selected = false, onToggleSelect, onLink, onGradeChange }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState(bet);
   const [isPosting, setIsPosting] = useState(false);
@@ -292,6 +294,16 @@ const BetCard: React.FC<BetCardProps> = ({ bet, settings, onUpdate, onDelete, on
             <Copy size={14}/>
           </button>
           )}
+
+          {bet.isPosted && onLink && (
+          <button
+            onClick={() => onLink(bet)}
+            className="p-1 sm:p-1.5 text-indigo-400 hover:text-white hover:bg-gray-700 rounded"
+            title="Link to another bot's play"
+          >
+            <Link2 size={14}/>
+          </button>
+          )}
           
           {!readOnly && (
           <button 
@@ -396,25 +408,25 @@ const BetCard: React.FC<BetCardProps> = ({ bet, settings, onUpdate, onDelete, on
         {!readOnly && bet.isPosted && (
           <div className="flex items-center space-x-2 mt-3 animate-fade-in flex-wrap gap-y-2">
             <button 
-              onClick={() => onUpdate(bet.id, { result: BetResult.WIN })}
+              onClick={() => onGradeChange ? onGradeChange(bet, BetResult.WIN) : onUpdate(bet.id, { result: BetResult.WIN })}
               className={`flex items-center px-3 py-1 rounded text-xs font-medium transition-colors ${bet.result === BetResult.WIN ? 'bg-green-600 text-white' : 'bg-[#4f545c] text-gray-300 hover:bg-green-700'}`}
             >
               <Check size={12} className="mr-1" /> WIN
             </button>
             <button 
-               onClick={() => onUpdate(bet.id, { result: BetResult.LOSS })}
+               onClick={() => onGradeChange ? onGradeChange(bet, BetResult.LOSS) : onUpdate(bet.id, { result: BetResult.LOSS })}
               className={`flex items-center px-3 py-1 rounded text-xs font-medium transition-colors ${bet.result === BetResult.LOSS ? 'bg-red-600 text-white' : 'bg-[#4f545c] text-gray-300 hover:bg-red-700'}`}
             >
               <X size={12} className="mr-1" /> LOSS
             </button>
             <button 
-               onClick={() => onUpdate(bet.id, { result: BetResult.PUSH })}
+               onClick={() => onGradeChange ? onGradeChange(bet, BetResult.PUSH) : onUpdate(bet.id, { result: BetResult.PUSH })}
               className={`flex items-center px-3 py-1 rounded text-xs font-medium transition-colors ${bet.result === BetResult.PUSH ? 'bg-yellow-600 text-black' : 'bg-[#4f545c] text-gray-300 hover:bg-yellow-700'}`}
             >
               <Clock size={12} className="mr-1" /> PUSH
             </button>
              <button 
-               onClick={() => onUpdate(bet.id, { result: BetResult.PENDING })}
+               onClick={() => onGradeChange ? onGradeChange(bet, BetResult.PENDING) : onUpdate(bet.id, { result: BetResult.PENDING })}
               className={`flex items-center px-3 py-1 rounded text-xs font-medium transition-colors ${bet.result === BetResult.PENDING ? 'bg-blue-600 text-white' : 'bg-[#4f545c] text-gray-300 hover:bg-blue-700'}`}
             >
               PENDING

@@ -153,6 +153,45 @@ export const initDatabase = async () => {
     )
   `);
 
+  // ── Feature: multi-role tagging + league-role mappings ───────────────────
+  await pool.query(`ALTER TABLE settings ADD COLUMN IF NOT EXISTS mention_roles JSONB DEFAULT '[]'`);
+  await pool.query(`ALTER TABLE settings ADD COLUMN IF NOT EXISTS league_role_mappings JSONB DEFAULT '[]'`);
+
+  // ── Feature: bet_links (cross-bot grade sync) ─────────────────────────────
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS bet_links (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      bet_id TEXT NOT NULL REFERENCES bets(id) ON DELETE CASCADE,
+      linked_bet_id TEXT NOT NULL REFERENCES bets(id) ON DELETE CASCADE,
+      created_at TIMESTAMPTZ DEFAULT now(),
+      UNIQUE(bet_id, linked_bet_id)
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_bet_links_bet_id ON bet_links (bet_id)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_bet_links_linked_bet_id ON bet_links (linked_bet_id)`);
+
+  // ── Feature: scheduled_messages ──────────────────────────────────────────
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS scheduled_messages (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      bot_id UUID NOT NULL REFERENCES bots(id) ON DELETE CASCADE,
+      content TEXT DEFAULT '',
+      image_url TEXT DEFAULT '',
+      image_data TEXT DEFAULT '',
+      image_filename TEXT DEFAULT '',
+      embed_title TEXT DEFAULT '',
+      embed_color INTEGER DEFAULT 16731469,
+      role_mentions JSONB DEFAULT '[]',
+      scheduled_time BIGINT NOT NULL,
+      is_sent BOOLEAN DEFAULT false,
+      created_at TIMESTAMPTZ DEFAULT now()
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_scheduled_messages_bot_id ON scheduled_messages (bot_id)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_scheduled_messages_pending ON scheduled_messages (scheduled_time) WHERE is_sent = false`);
+
   // ── Migrations for existing databases ───────────────────────────────────
   await migrateSettingsPK();
   await migrateDefaultBots();

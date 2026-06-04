@@ -54,11 +54,42 @@ export interface AppSettings {
   defaultBetAlertTitle: string;
   betEmbedColor: number;
   recapEmbedColor: number;
+  mentionRoles: Array<{ id: string; name: string }>;
+  leagueRoleMappings: Array<{ league: string; roleId: string; roleName: string }>;
 }
 
 export interface User {
   id: string;
   email: string;
+}
+
+export interface BetLink {
+  id: string;
+  betId: string;
+  linkedBetId: string;
+  linkedBotId: string;
+  linkedBotName: string;
+  linkedPlayerA: string;
+  linkedPlayerB: string;
+  linkedLeague: string;
+  linkedSlateDate?: string;
+  linkedResult?: string;
+  createdAt: string;
+}
+
+export interface ScheduledMessage {
+  id: string;
+  botId: string;
+  content: string;
+  imageUrl: string;
+  imageData: string;
+  imageFilename: string;
+  embedTitle: string;
+  embedColor: number;
+  roleMentions: Array<{ id: string; name: string }>;
+  scheduledTime: number;
+  isSent: boolean;
+  createdAt: string;
 }
 
 export interface DailyRecap {

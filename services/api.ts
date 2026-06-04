@@ -183,3 +183,74 @@ export const recapsAPI = {
   }
 };
 
+export const betLinksAPI = {
+  getLinks: async (betId: string) => {
+    const res = await fetch(`${API_URL}/bet-links?betId=${encodeURIComponent(betId)}`, { headers: authHeaders() });
+    await handleResponse(res);
+    return res.json();
+  },
+
+  getSuggestions: async (betId: string) => {
+    const res = await fetch(`${API_URL}/bet-links/suggestions?betId=${encodeURIComponent(betId)}`, { headers: authHeaders() });
+    await handleResponse(res);
+    return res.json();
+  },
+
+  createLink: async (betId: string, linkedBetId: string) => {
+    const res = await fetch(`${API_URL}/bet-links`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ betId, linkedBetId })
+    });
+    await handleResponse(res);
+    return res.json();
+  },
+
+  deleteLink: async (id: string) => {
+    const res = await fetch(`${API_URL}/bet-links/${id}`, {
+      method: 'DELETE',
+      headers: authHeaders()
+    });
+    await handleResponse(res);
+  }
+};
+
+export const messagesAPI = {
+  getAll: async (botId: string, includeSent = false) => {
+    const res = await fetch(
+      `${API_URL}/messages?botId=${encodeURIComponent(botId)}&includeSent=${includeSent}`,
+      { headers: authHeaders() }
+    );
+    await handleResponse(res);
+    return res.json();
+  },
+
+  create: async (msg: Record<string, unknown>) => {
+    const res = await fetch(`${API_URL}/messages`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(msg)
+    });
+    await handleResponse(res);
+    return res.json();
+  },
+
+  update: async (id: string, msg: Record<string, unknown>) => {
+    const res = await fetch(`${API_URL}/messages/${id}`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify(msg)
+    });
+    await handleResponse(res);
+    return res.json();
+  },
+
+  delete: async (id: string) => {
+    const res = await fetch(`${API_URL}/messages/${id}`, {
+      method: 'DELETE',
+      headers: authHeaders()
+    });
+    await handleResponse(res);
+  }
+};
+

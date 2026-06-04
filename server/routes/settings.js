@@ -45,7 +45,9 @@ const formatSettings = (s, defaults = {}) => ({
   recapIncludeLeagueStats: s.recapIncludeLeagueStats ?? false,
   defaultBetAlertTitle: s.defaultBetAlertTitle || '📢 Bet Alert',
   betEmbedColor: s.betEmbedColor || 16731469,
-  recapEmbedColor: s.recapEmbedColor || 16731469
+  recapEmbedColor: s.recapEmbedColor || 16731469,
+  mentionRoles: s.mention_roles ?? [],
+  leagueRoleMappings: s.league_role_mappings ?? []
 });
 
 // Verify botId belongs to the authenticated user
@@ -96,8 +98,9 @@ router.put('/', async (req, res) => {
         "botAvatarUrl", "scheduleOffsetMinutes", "slateTimezone", "defaultOdds",
         "aiInstructions", "recapTitle", "recapIncludeDate", "recapIncludeRecord",
         "recapIncludeNetUnits", "recapIncludeROI", "recapIncludeLeagueStats",
-        "defaultBetAlertTitle", "betEmbedColor", "recapEmbedColor"
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
+        "defaultBetAlertTitle", "betEmbedColor", "recapEmbedColor",
+        mention_roles, league_role_mappings
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
       ON CONFLICT (bot_id) DO UPDATE SET
         "mentionString" = EXCLUDED."mentionString",
         "discordWebhookUrl" = EXCLUDED."discordWebhookUrl",
@@ -116,7 +119,9 @@ router.put('/', async (req, res) => {
         "recapIncludeLeagueStats" = EXCLUDED."recapIncludeLeagueStats",
         "defaultBetAlertTitle" = EXCLUDED."defaultBetAlertTitle",
         "betEmbedColor" = EXCLUDED."betEmbedColor",
-        "recapEmbedColor" = EXCLUDED."recapEmbedColor"
+        "recapEmbedColor" = EXCLUDED."recapEmbedColor",
+        mention_roles = EXCLUDED.mention_roles,
+        league_role_mappings = EXCLUDED.league_role_mappings
       RETURNING *`,
       [
         botId,
@@ -138,7 +143,9 @@ router.put('/', async (req, res) => {
         s.recapIncludeLeagueStats ?? false,
         s.defaultBetAlertTitle || '📢 Bet Alert',
         s.betEmbedColor || 16731469,
-        s.recapEmbedColor || 16731469
+        s.recapEmbedColor || 16731469,
+        JSON.stringify(Array.isArray(s.mentionRoles) ? s.mentionRoles : []),
+        JSON.stringify(Array.isArray(s.leagueRoleMappings) ? s.leagueRoleMappings : [])
       ]
     );
 
