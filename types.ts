@@ -54,8 +54,8 @@ export interface AppSettings {
   defaultBetAlertTitle: string;
   betEmbedColor: number;
   recapEmbedColor: number;
-  mentionRoles: Array<{ id: string; name: string }>;
-  leagueRoleMappings: Array<{ league: string; roleId: string; roleName: string }>;
+  defaultRoles: Array<{ id: string; name: string }>;
+  leagueRoleMappings: Array<{ league: string; roleId: string; roleName: string; roles: Array<{ id: string; name: string }> }>;
 }
 
 export interface User {

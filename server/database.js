@@ -155,6 +155,7 @@ export const initDatabase = async () => {
 
   // ── Feature: multi-role tagging + league-role mappings ───────────────────
   await pool.query(`ALTER TABLE settings ADD COLUMN IF NOT EXISTS mention_roles JSONB DEFAULT '[]'`);
+  await pool.query(`ALTER TABLE settings ADD COLUMN IF NOT EXISTS default_roles JSONB DEFAULT '[]'`);
   await pool.query(`ALTER TABLE settings ADD COLUMN IF NOT EXISTS league_role_mappings JSONB DEFAULT '[]'`);
 
   // ── Feature: bet_links (cross-bot grade sync) ─────────────────────────────

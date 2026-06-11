@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, Edit2, X, Clock, Image as ImageIcon, MessageSquare } from 'lucide-react';
 import { AppSettings, ScheduledMessage } from '../types';
 import { messagesAPI } from '../services/api';
+import { getAvailableRoles } from '../src/utils/roleUtils';
 
 interface ScheduledMessagesProps {
   botId: string;
@@ -165,8 +166,7 @@ const ScheduledMessages: React.FC<ScheduledMessagesProps> = ({ botId, settings }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const availableRoles = settings.mentionRoles || [];
-
+  const availableRoles = null; // kept for shape; role tagging now uses mentionString directly
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -316,33 +316,43 @@ const ScheduledMessages: React.FC<ScheduledMessagesProps> = ({ botId, settings }
           </div>
 
           {/* Role Tags */}
-          {availableRoles.length > 0 && (
-            <div>
-              <label className="block text-xs text-gray-400 mb-1">Tag Roles (optional)</label>
-              <div className="flex flex-wrap gap-2">
-                {availableRoles.map(role => {
-                  const isSelected = (form.roleMentions || []).some(r => r.id === role.id);
-                  return (
-                    <button
-                      key={role.id}
-                      type="button"
-                      onClick={() => handleToggleRole(role.id, role.name)}
-                      className={`text-xs px-3 py-1 rounded transition-colors border ${
-                        isSelected
-                          ? 'bg-indigo-600/30 border-indigo-500 text-indigo-300'
-                          : 'bg-[#202225] border-gray-600 text-gray-400 hover:text-white'
-                      }`}
-                    >
-                      @{role.name}
-                    </button>
-                  );
-                })}
+          {(() => {
+            const roles = getAvailableRoles(settings);
+            if (roles.length === 0) return (
+              <p className="text-xs text-gray-500 italic">Configure roles in Settings to enable role tagging.</p>
+            );
+            return (
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Tag Roles (optional)</label>
+                <div className="flex flex-wrap gap-2">
+                  {roles.map(role => {
+                    const isSelected = (form.roleMentions || []).some(r => r.id === role.id);
+                    return (
+                      <button
+                        key={role.id}
+                        type="button"
+                        onClick={() => setForm(prev => ({
+                          ...prev,
+                          roleMentions: isSelected
+                            ? (prev.roleMentions || []).filter(r => r.id !== role.id)
+                            : [...(prev.roleMentions || []), { id: role.id, name: role.name }]
+                        }))}
+                        title={role.source !== 'Default' ? `${role.source} override` : 'Default role'}
+                        className={`text-xs px-3 py-1 rounded transition-colors border ${
+                          isSelected
+                            ? 'bg-indigo-600/30 border-indigo-500 text-indigo-300'
+                            : 'bg-[#202225] border-gray-600 text-gray-400 hover:text-white'
+                        }`}
+                      >
+                        @{role.name}
+                        {role.source !== 'Default' && <span className="ml-1 opacity-50 text-[10px]">({role.source})</span>}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-              {availableRoles.length === 0 && (
-                <p className="text-xs text-gray-500 italic">Add roles in Settings to enable role tagging.</p>
-              )}
-            </div>
-          )}
+            );
+          })()}
 
           <div className="flex justify-end gap-2 pt-2">
             <button

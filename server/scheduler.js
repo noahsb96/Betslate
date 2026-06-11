@@ -1,4 +1,5 @@
 import pool from './database.js';
+import { resolveMentionContent } from './utils/roleUtils.js';
 
 // Per-webhook rate-limit tracking (keyed by webhook URL)
 const webhookLastPost = new Map();   // url → timestamp of last successful post
@@ -7,33 +8,6 @@ const webhookRetryAfter = new Map(); // url → timestamp when rate limit expire
 const MIN_POST_INTERVAL_MS = 1500; // minimum 1.5s between posts to the same webhook
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-
-const resolveMentionContent = (league, settings) => {
-  const roles = settings.mentionRoles || [];
-  const mappings = settings.leagueRoleMappings || [];
-  const leagueMapping = mappings.find(m => m.league === league);
-  let selectedRoles;
-  if (leagueMapping) {
-    selectedRoles = [{ id: leagueMapping.roleId, name: leagueMapping.roleName }];
-  } else if (roles.length > 0) {
-    selectedRoles = roles;
-  } else {
-    // Fallback to legacy mentionString
-    let content = settings.mentionString || '';
-    if (content && /^\d+$/.test(content.trim())) {
-      content = `<@&${content.trim()}>`;
-    }
-    const roleIds = [];
-    for (const m of content.matchAll(/<@&(\d+)>/g)) {
-      roleIds.push(m[1]);
-    }
-    return { content, roleIds };
-  }
-  return {
-    content: selectedRoles.map(r => `<@&${r.id}>`).join(' '),
-    roleIds: selectedRoles.map(r => r.id)
-  };
-};
 
 const postToDiscord = async (bet, settings) => {
   if (!settings.discordWebhookUrl) return false;
@@ -192,6 +166,7 @@ export const startScheduler = () => {
           s."scheduleOffsetMinutes", s."slateTimezone", s."defaultOdds",
           s."defaultBetAlertTitle", s."betEmbedColor",
           s.mention_roles AS "mentionRoles",
+          s.default_roles AS "defaultRoles",
           s.league_role_mappings AS "leagueRoleMappings"
         FROM bets b
         LEFT JOIN settings s ON b.bot_id = s.bot_id

@@ -17,8 +17,10 @@ import ConfirmEmailChangePage from './components/auth/ConfirmEmailChangePage';
 import { analyzeSlateImage } from './services/geminiService';
 import { betsAPI, settingsAPI, botsAPI, betLinksAPI, messagesAPI } from './services/api';
 import { authAPI, getToken, clearToken } from './services/authAPI';
-import { Bet, BetResult, AppSettings, BetLink, User, Bot as BotType } from './types';
+import { Bet, BetResult, AppSettings, BetLink, ScheduledMessage, User, Bot as BotType } from './types';
 import ScheduledMessages from './components/ScheduledMessages';
+import QueueMessageCard from './components/QueueMessageCard';
+import { getAvailableRoles, resolveMentionContent as resolveRoles } from './src/utils/roleUtils';
 
 // Returns today's date in YYYY-MM-DD using the browser's local timezone,
 // not UTC (which can be a day ahead for users in timezones behind UTC).
@@ -45,7 +47,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     defaultBetAlertTitle: '📢 Bet Alert',
     betEmbedColor: 16731469,
     recapEmbedColor: 16731469,
-    mentionRoles: [],
+    defaultRoles: [],
     leagueRoleMappings: [],
     aiInstructions: `You are an expert sports betting assistant specialized in Table Tennis.
 Your task is to analyze an image of a betting slate and extract the structured betting data.
@@ -107,6 +109,16 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
   const [existingLinks, setExistingLinks] = useState<BetLink[]>([]);
   // ── Grade sync prompts ───────────────────────────────────────────────────────────────
   const [gradeSyncPrompts, setGradeSyncPrompts] = useState<Array<BetLink & { pendingResult: BetResult }>>([]);
+
+  // ── Queue messages state ────────────────────────────────────────────────────────
+  const [queueMessages, setQueueMessages] = useState<ScheduledMessage[]>([]);
+  const [inlineMsg, setInlineMsg] = useState<{
+    pos: number;
+    editId?: string;
+    content: string;
+    scheduledTime: number;
+    roleMentions: Array<{ id: string; name: string }>;
+  } | null>(null);
   // Prevents the settings auto-save from firing while we're loading settings
   // for a different bot (which would overwrite the old bot's settings row).
   const isLoadingSettings = useRef(false);
@@ -124,13 +136,15 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
          const bot = botList[0];
          setActiveBot(bot);
 
-         const [betsData, settingsData] = await Promise.all([
+         const [betsData, settingsData, msgsData] = await Promise.all([
            betsAPI.getAll(bot.id),
-           settingsAPI.get(bot.id)
+           settingsAPI.get(bot.id),
+           messagesAPI.getAll(bot.id, false)
          ]);
          setBets(betsData);
          isLoadingSettings.current = true;
          setAppSettings(settingsData);
+         setQueueMessages(msgsData);
        } catch (err) {
          console.error('Failed to load data:', err);
        }
@@ -467,29 +481,7 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
       return false;
     }
 
-    const resolveMentionContent = (league: string): { content: string; roleIds: string[] } => {
-      const roles = appSettings.mentionRoles || [];
-      const mappings = appSettings.leagueRoleMappings || [];
-      const leagueMapping = mappings.find(m => m.league === league);
-      let selectedRoles: Array<{id: string; name: string}>;
-      if (leagueMapping) {
-        selectedRoles = [{ id: leagueMapping.roleId, name: leagueMapping.roleName }];
-      } else if (roles.length > 0) {
-        selectedRoles = roles;
-      } else {
-        let content = appSettings.mentionString || '';
-        if (content && /^\d+$/.test(content.trim())) content = `<@&${content.trim()}>`;
-        const roleIds: string[] = [];
-        for (const m of content.matchAll(/<@&(\d+)>/g)) roleIds.push(m[1]);
-        return { content, roleIds };
-      }
-      return {
-        content: selectedRoles.map(r => `<@&${r.id}>`).join(' '),
-        roleIds: selectedRoles.map(r => r.id)
-      };
-    };
-
-    const { content: mentionContent, roleIds } = resolveMentionContent(bet.league);
+    const { content: mentionContent, roleIds } = resolveRoles(bet.league, appSettings);
 
     const payload = {
       username: appSettings.botName || "AI BetSlate Automator",
@@ -538,13 +530,15 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
     if (bot.id === activeBot?.id) return;
     setActiveBot(bot);
     try {
-      const [betsData, settingsData] = await Promise.all([
+      const [betsData, settingsData, msgsData] = await Promise.all([
         betsAPI.getAll(bot.id),
-        settingsAPI.get(bot.id)
+        settingsAPI.get(bot.id),
+        messagesAPI.getAll(bot.id, false)
       ]);
       setBets(betsData);
       isLoadingSettings.current = true;
       setAppSettings(settingsData);
+      setQueueMessages(msgsData);
     } catch (err) {
       console.error('Failed to load bot data:', err);
     }
@@ -637,6 +631,75 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
     if (historyFilter === 'push') return bet.result === BetResult.PUSH;
     return true;
   });
+
+  // ── Queue message helpers ────────────────────────────────────────────────────
+  type QueueItem = { type: 'bet'; data: Bet } | { type: 'msg'; data: ScheduledMessage };
+  const scheduleOffsetMs = appSettings.scheduleOffsetMinutes * 60000;
+  const getItemTime = (item: QueueItem): number => {
+    if (item.type === 'bet') {
+      const b = item.data;
+      return b.customScheduleTime || (b.matchTimestamp ? b.matchTimestamp - scheduleOffsetMs : 0);
+    }
+    return item.data.scheduledTime;
+  };
+  const mergedQueue: QueueItem[] = [
+    ...queueBets.map(b => ({ type: 'bet' as const, data: b })),
+    ...queueMessages.map(m => ({ type: 'msg' as const, data: m }))
+  ].sort((a, b) => {
+    const ta = getItemTime(a); const tb = getItemTime(b);
+    if (ta === 0 && tb === 0) return 0;
+    if (ta === 0) return 1; if (tb === 0) return -1;
+    return ta - tb;
+  });
+  const suggestTimeAt = (afterIdx: number): number => {
+    if (mergedQueue.length === 0) return Date.now() + 15 * 60000;
+    if (afterIdx < 0) {
+      const ft = getItemTime(mergedQueue[0]);
+      return ft > 0 ? Math.max(Date.now(), ft - 5 * 60000) : Date.now() + 5 * 60000;
+    }
+    const prev = getItemTime(mergedQueue[afterIdx]);
+    if (afterIdx + 1 < mergedQueue.length) {
+      const next = getItemTime(mergedQueue[afterIdx + 1]);
+      if (prev > 0 && next > 0) return Math.round((prev + next) / 2);
+    }
+    return prev > 0 ? prev + 5 * 60000 : Date.now() + 5 * 60000;
+  };
+  const qTsToInput = (ts: number): string => {
+    const d = new Date(ts);
+    const tz = appSettings.slateTimezone || 'America/New_York';
+    const p = new Intl.DateTimeFormat('en-US', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(d);
+    const g = (t: string) => p.find(x => x.type === t)?.value ?? '00';
+    return `${g('year')}-${g('month')}-${g('day')}T${String(Number(g('hour')) % 24).padStart(2,'0')}:${g('minute')}`;
+  };
+  const qInputToTs = (v: string): number => {
+    if (!v) return Date.now() + 3600000;
+    const [dp, tp] = v.split('T');
+    const [yr, mo, dy] = dp.split('-').map(Number);
+    const [hr, mn] = tp.split(':').map(Number);
+    const tz = appSettings.slateTimezone || 'America/New_York';
+    const nu = Date.UTC(yr, mo - 1, dy, hr, mn);
+    const tzp = new Intl.DateTimeFormat('en-US', { timeZone: tz, year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', hour12: false }).formatToParts(new Date(nu));
+    const gp = (t: string) => Number(tzp.find(x => x.type === t)?.value ?? '0');
+    return nu + (nu - Date.UTC(gp('year'), gp('month') - 1, gp('day'), gp('hour') % 24, gp('minute')));
+  };
+  const handleSaveInlineMessage = async () => {
+    if (!inlineMsg || !activeBot) return;
+    const roleMentions = inlineMsg.roleMentions || [];
+    try {
+      if (inlineMsg.editId) {
+        const updated = await messagesAPI.update(inlineMsg.editId, { content: inlineMsg.content, scheduledTime: inlineMsg.scheduledTime, roleMentions });
+        setQueueMessages(prev => prev.map(m => m.id === inlineMsg.editId ? updated : m));
+      } else {
+        const created = await messagesAPI.create({ botId: activeBot.id, content: inlineMsg.content, scheduledTime: inlineMsg.scheduledTime, roleMentions, imageUrl: '', imageData: '', imageFilename: '', embedTitle: '', embedColor: appSettings.betEmbedColor });
+        setQueueMessages(prev => [...prev, created]);
+      }
+      setInlineMsg(null);
+    } catch (e: any) { alert(e.message || 'Failed to save message'); }
+  };
+  const handleDeleteQueueMessage = async (id: string) => {
+    try { await messagesAPI.delete(id); setQueueMessages(prev => prev.filter(m => m.id !== id)); }
+    catch (e: any) { alert(e.message || 'Failed to delete message'); }
+  };
 
   return (
     <div className="min-h-screen bg-[#36393f] font-sans text-gray-100 pb-20">
@@ -793,120 +856,81 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
                      <label className="text-sm font-medium text-gray-300">Default Roles to Mention</label>
                      <button
                        type="button"
-                       onClick={() => setAppSettings({ ...appSettings, mentionRoles: [...(appSettings.mentionRoles || []), { id: '', name: '' }] })}
+                       onClick={() => setAppSettings({ ...appSettings, defaultRoles: [...(appSettings.defaultRoles || []), { id: '', name: '' }] })}
                        className="text-xs px-2 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded"
                      >+ Add Role</button>
                    </div>
-                   {(appSettings.mentionRoles || []).length === 0 && (
-                     <p className="text-xs text-gray-500 italic">No roles configured. Add a role or use the legacy field below.</p>
+                   {(appSettings.defaultRoles || []).length === 0 && !appSettings.mentionString && (
+                     <p className="text-xs text-gray-500 italic">No roles configured. Add a role to enable pinging.</p>
                    )}
                    <div className="space-y-2">
-                     {(appSettings.mentionRoles || []).map((role, idx) => (
+                     {(appSettings.defaultRoles || []).map((role, idx) => (
                        <div key={idx} className="flex items-center gap-2">
-                         <input
-                           type="text"
-                           placeholder="Display name (e.g. Chefs Plays)"
-                           value={role.name}
-                           onChange={e => {
-                             const updated = [...(appSettings.mentionRoles || [])];
-                             updated[idx] = { ...updated[idx], name: e.target.value };
-                             setAppSettings({ ...appSettings, mentionRoles: updated });
-                           }}
-                           className="flex-1 bg-[#202225] border border-gray-700 rounded p-2 text-white text-sm focus:outline-none focus:border-blue-500"
-                         />
-                         <input
-                           type="text"
-                           placeholder="Role ID"
-                           value={role.id}
-                           onChange={e => {
-                             const updated = [...(appSettings.mentionRoles || [])];
-                             updated[idx] = { ...updated[idx], id: e.target.value };
-                             setAppSettings({ ...appSettings, mentionRoles: updated });
-                           }}
-                           className="w-36 bg-[#202225] border border-gray-700 rounded p-2 text-white text-sm focus:outline-none focus:border-blue-500"
-                         />
-                         <button
-                           type="button"
-                           onClick={() => setAppSettings({ ...appSettings, mentionRoles: (appSettings.mentionRoles || []).filter((_, i) => i !== idx) })}
-                           className="p-2 text-red-400 hover:text-red-200"
-                         ><X size={14}/></button>
+                         <input type="text" placeholder="Display name (e.g. Chefs Plays)" value={role.name}
+                           onChange={e => { const u = [...(appSettings.defaultRoles || [])]; u[idx] = { ...u[idx], name: e.target.value }; setAppSettings({ ...appSettings, defaultRoles: u }); }}
+                           className="flex-1 bg-[#202225] border border-gray-700 rounded p-2 text-white text-sm focus:outline-none focus:border-blue-500"/>
+                         <input type="text" placeholder="Role ID" value={role.id}
+                           onChange={e => { const u = [...(appSettings.defaultRoles || [])]; u[idx] = { ...u[idx], id: e.target.value }; setAppSettings({ ...appSettings, defaultRoles: u }); }}
+                           className="w-40 bg-[#202225] border border-gray-700 rounded p-2 text-white text-sm focus:outline-none focus:border-blue-500"/>
+                         <button type="button" onClick={() => setAppSettings({ ...appSettings, defaultRoles: (appSettings.defaultRoles || []).filter((_, i) => i !== idx) })} className="p-2 text-red-400 hover:text-red-200"><X size={14}/></button>
                        </div>
                      ))}
                    </div>
-                   <p className="text-xs text-gray-500 mt-1">Right-click a role in Discord → Copy Role ID</p>
+                   {(appSettings.defaultRoles || []).length === 0 && (
+                     <div className="mt-2">
+                       <label className="block text-xs text-gray-500 mb-1">Legacy single-role fallback</label>
+                       <input type="text" value={appSettings.mentionString}
+                         onChange={(e) => setAppSettings({...appSettings, mentionString: e.target.value})}
+                         placeholder="Role ID (e.g. 1456488731832750141)"
+                         className="w-full bg-[#202225] border border-gray-700 rounded p-2 text-white text-sm focus:outline-none focus:border-blue-500"/>
+                       <p className="text-xs text-gray-500 mt-1">Only used when no roles are added above. Right-click role in Discord → Copy ID.</p>
+                     </div>
+                   )}
                  </div>
 
                  <div>
                    <div className="flex items-center justify-between mb-2">
                      <label className="text-sm font-medium text-gray-300">League-Specific Role Overrides</label>
-                     <button
-                       type="button"
-                       onClick={() => setAppSettings({ ...appSettings, leagueRoleMappings: [...(appSettings.leagueRoleMappings || []), { league: 'TT Elite Series', roleId: '', roleName: '' }] })}
+                     <button type="button"
+                       onClick={() => setAppSettings({ ...appSettings, leagueRoleMappings: [...(appSettings.leagueRoleMappings || []), { league: '', roleId: '', roleName: '', roles: [] }] })}
                        className="text-xs px-2 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded"
-                     >+ Add Mapping</button>
+                     >+ Add Override</button>
                    </div>
                    {(appSettings.leagueRoleMappings || []).length === 0 && (
-                     <p className="text-xs text-gray-500 italic">When set, a league's mapped role replaces the default roles for that league's alerts.</p>
+                     <p className="text-xs text-gray-500 italic">Override which roles are pinged for a specific league.</p>
                    )}
-                   <div className="space-y-2">
-                     {(appSettings.leagueRoleMappings || []).map((mapping, idx) => (
-                       <div key={idx} className="flex items-center gap-2 flex-wrap">
-                         <select
-                           value={mapping.league}
-                           onChange={e => {
-                             const updated = [...(appSettings.leagueRoleMappings || [])];
-                             updated[idx] = { ...updated[idx], league: e.target.value };
-                             setAppSettings({ ...appSettings, leagueRoleMappings: updated });
-                           }}
-                           className="bg-[#202225] border border-gray-700 rounded p-2 text-white text-sm focus:outline-none focus:border-blue-500"
-                         >
-                           <option>TT Elite Series</option>
-                           <option>TT Cup</option>
-                           <option>Czech Liga Pro</option>
-                           <option>Setka Cup</option>
-                         </select>
-                         <input
-                           type="text"
-                           placeholder="Role name"
-                           value={mapping.roleName}
-                           onChange={e => {
-                             const updated = [...(appSettings.leagueRoleMappings || [])];
-                             updated[idx] = { ...updated[idx], roleName: e.target.value };
-                             setAppSettings({ ...appSettings, leagueRoleMappings: updated });
-                           }}
-                           className="flex-1 min-w-0 bg-[#202225] border border-gray-700 rounded p-2 text-white text-sm focus:outline-none focus:border-blue-500"
-                         />
-                         <input
-                           type="text"
-                           placeholder="Role ID"
-                           value={mapping.roleId}
-                           onChange={e => {
-                             const updated = [...(appSettings.leagueRoleMappings || [])];
-                             updated[idx] = { ...updated[idx], roleId: e.target.value };
-                             setAppSettings({ ...appSettings, leagueRoleMappings: updated });
-                           }}
-                           className="w-36 bg-[#202225] border border-gray-700 rounded p-2 text-white text-sm focus:outline-none focus:border-blue-500"
-                         />
-                         <button
-                           type="button"
-                           onClick={() => setAppSettings({ ...appSettings, leagueRoleMappings: (appSettings.leagueRoleMappings || []).filter((_, i) => i !== idx) })}
-                           className="p-2 text-red-400 hover:text-red-200"
-                         ><X size={14}/></button>
-                       </div>
-                     ))}
+                   <div className="space-y-3">
+                     {(appSettings.leagueRoleMappings || []).map((mapping, idx) => {
+                       const knownLeagues = [...new Set(bets.map(b => b.league).filter(Boolean))] as string[];
+                       const mappingRoles = (mapping.roles || []).length > 0 ? mapping.roles : (mapping.roleId ? [{ id: mapping.roleId, name: mapping.roleName }] : []);
+                       return (
+                         <div key={idx} className="bg-[#202225] rounded p-3 space-y-2">
+                           <div className="flex items-center gap-2">
+                             <input list={`leagues-${idx}`} value={mapping.league}
+                               onChange={e => { const u = [...(appSettings.leagueRoleMappings || [])]; u[idx] = { ...u[idx], league: e.target.value }; setAppSettings({ ...appSettings, leagueRoleMappings: u }); }}
+                               placeholder="League name"
+                               className="flex-1 bg-[#36393f] border border-gray-600 rounded p-2 text-white text-sm focus:outline-none focus:border-blue-500"/>
+                             <datalist id={`leagues-${idx}`}>{knownLeagues.map(l => <option key={l} value={l}/>)}</datalist>
+                             <button type="button" onClick={() => setAppSettings({ ...appSettings, leagueRoleMappings: (appSettings.leagueRoleMappings || []).filter((_, i) => i !== idx) })} className="p-2 text-red-400 hover:text-red-200"><X size={14}/></button>
+                           </div>
+                           <div className="space-y-1.5 pl-1">
+                             {mappingRoles.map((r, ri) => (
+                               <div key={ri} className="flex items-center gap-2">
+                                 <input type="text" placeholder="Role name" value={r.name}
+                                   onChange={e => { const u = [...(appSettings.leagueRoleMappings || [])]; const mr = [...mappingRoles]; mr[ri] = { ...mr[ri], name: e.target.value }; u[idx] = { ...u[idx], roles: mr, roleId: mr[0]?.id || '', roleName: mr[0]?.name || '' }; setAppSettings({ ...appSettings, leagueRoleMappings: u }); }}
+                                   className="flex-1 bg-[#36393f] border border-gray-600 rounded p-1.5 text-white text-xs focus:outline-none focus:border-blue-500"/>
+                                 <input type="text" placeholder="Role ID" value={r.id}
+                                   onChange={e => { const u = [...(appSettings.leagueRoleMappings || [])]; const mr = [...mappingRoles]; mr[ri] = { ...mr[ri], id: e.target.value }; u[idx] = { ...u[idx], roles: mr, roleId: mr[0]?.id || '', roleName: mr[0]?.name || '' }; setAppSettings({ ...appSettings, leagueRoleMappings: u }); }}
+                                   className="w-36 bg-[#36393f] border border-gray-600 rounded p-1.5 text-white text-xs focus:outline-none focus:border-blue-500"/>
+                                 <button type="button" onClick={() => { const u = [...(appSettings.leagueRoleMappings || [])]; const mr = mappingRoles.filter((_, i) => i !== ri); u[idx] = { ...u[idx], roles: mr, roleId: mr[0]?.id || '', roleName: mr[0]?.name || '' }; setAppSettings({ ...appSettings, leagueRoleMappings: u }); }} className="p-1 text-red-400 hover:text-red-200"><X size={12}/></button>
+                               </div>
+                             ))}
+                             <button type="button" onClick={() => { const u = [...(appSettings.leagueRoleMappings || [])]; const mr = [...mappingRoles, { id: '', name: '' }]; u[idx] = { ...u[idx], roles: mr }; setAppSettings({ ...appSettings, leagueRoleMappings: u }); }} className="text-xs text-indigo-400 hover:text-indigo-200">+ Add role for this league</button>
+                           </div>
+                         </div>
+                       );
+                     })}
                    </div>
-                 </div>
-
-                 <div>
-                   <label className="block text-sm text-gray-400 mb-1">Legacy Role to Mention (Role ID)</label>
-                   <input
-                     type="text"
-                     value={appSettings.mentionString}
-                     onChange={(e) => setAppSettings({...appSettings, mentionString: e.target.value})}
-                     placeholder="1456488731832750141"
-                     className="w-full bg-[#202225] border border-gray-700 rounded p-2 text-white focus:outline-none focus:border-blue-500"
-                   />
-                   <p className="text-xs text-gray-500 mt-1">Used as fallback when no roles are configured above</p>
                  </div>
                </div>
 
@@ -1152,24 +1176,108 @@ const MainApp: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogou
                   )}
                 </div>
               )}
-              {queueBets.length === 0 ? (
+              {mergedQueue.length === 0 && !inlineMsg ? (
                 <div className="text-center py-12 text-gray-500 border border-dashed border-gray-700 rounded-lg">
-                   Queue is empty. Upload a slate or add a manual bet.
+                  Queue is empty. Upload a slate or add a manual bet.
                 </div>
               ) : (
-                queueBets.map(bet => (
-                  <BetCard 
-                    key={bet.id} 
-                    bet={bet} 
-                    settings={appSettings}
-                    onUpdate={handleUpdateBet}
-                    onDelete={handleDeleteBet}
-                    onCopy={handleCopyBet}
-                    onPostToDiscord={handlePostToDiscord}
-                    selected={selectMode && selectedBetIds.has(bet.id)}
-                    onToggleSelect={selectMode ? () => toggleBetSelection(bet.id) : undefined}
-                  />
-                ))
+                <>
+                  {/* Inline add-message form before first item */}
+                  {inlineMsg?.pos === -1 && (
+                    <div className="bg-[#2f3136] border border-indigo-700 rounded-lg p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-indigo-300 flex items-center gap-1.5"><MessageSquare size={12}/> {inlineMsg.editId ? 'Edit Message' : 'New Message'}</span>
+                        <button onClick={() => setInlineMsg(null)} className="text-gray-500 hover:text-white"><X size={13}/></button>
+                      </div>
+                      <textarea value={inlineMsg.content} onChange={e => setInlineMsg(p => p ? {...p, content: e.target.value} : p)} placeholder="Message content..." rows={2} className="w-full bg-[#202225] border border-gray-700 rounded p-2 text-white text-sm focus:outline-none focus:border-indigo-500 resize-none"/>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <input type="datetime-local" value={qTsToInput(inlineMsg.scheduledTime)} onChange={e => setInlineMsg(p => p ? {...p, scheduledTime: qInputToTs(e.target.value)} : p)} className="flex-1 min-w-0 bg-[#202225] border border-gray-700 rounded p-1.5 text-white text-xs focus:outline-none focus:border-indigo-500"/>
+                      </div>
+                      {getAvailableRoles(appSettings).length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          <span className="text-xs text-gray-500 self-center">Tag:</span>
+                          {getAvailableRoles(appSettings).map(r => {
+                            const sel = (inlineMsg.roleMentions || []).some(x => x.id === r.id);
+                            return <button key={r.id} type="button" onClick={() => setInlineMsg(p => p ? {...p, roleMentions: sel ? p.roleMentions.filter(x => x.id !== r.id) : [...p.roleMentions, {id: r.id, name: r.name}]} : p)} className={`text-xs px-2 py-0.5 rounded border transition-colors ${sel ? 'bg-indigo-600/30 border-indigo-500 text-indigo-300' : 'bg-[#202225] border-gray-600 text-gray-400 hover:text-white'}`} title={r.source !== 'Default' ? `${r.source} override` : 'Default role'}>@{r.name}{r.source !== 'Default' ? <span className="ml-1 opacity-50">({r.source})</span> : null}</button>;
+                          })}
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2">
+                        <button onClick={handleSaveInlineMessage} className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs rounded">{inlineMsg.editId ? 'Save' : 'Schedule'}</button>
+                        <button onClick={() => setInlineMsg(null)} className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs rounded">Cancel</button>
+                      </div>
+                    </div>
+                  )}
+                  {/* Add-here divider before first item (only if no inline form there) */}
+                  {!inlineMsg && (
+                    <div className="flex items-center gap-2 my-0.5">
+                      <div className="flex-1 border-t border-dashed border-gray-700"/>
+                      <button onClick={() => setInlineMsg({ pos: -1, content: '', scheduledTime: suggestTimeAt(-1), roleMentions: [] })} className="flex items-center gap-1 text-xs text-gray-600 hover:text-indigo-400 px-2 py-0.5 rounded border border-dashed border-transparent hover:border-indigo-700 transition-colors">
+                        <Plus size={10}/> message
+                      </button>
+                      <div className="flex-1 border-t border-dashed border-gray-700"/>
+                    </div>
+                  )}
+                  {mergedQueue.map((item, idx) => (
+                    <React.Fragment key={item.type === 'bet' ? item.data.id : `msg-${item.data.id}`}>
+                      {item.type === 'bet' ? (
+                        <BetCard
+                          bet={item.data}
+                          settings={appSettings}
+                          onUpdate={handleUpdateBet}
+                          onDelete={handleDeleteBet}
+                          onCopy={handleCopyBet}
+                          onPostToDiscord={handlePostToDiscord}
+                          selected={selectMode && selectedBetIds.has(item.data.id)}
+                          onToggleSelect={selectMode ? () => toggleBetSelection(item.data.id) : undefined}
+                        />
+                      ) : (
+                        <QueueMessageCard
+                          message={item.data}
+                          settings={appSettings}
+                          onDelete={handleDeleteQueueMessage}
+                          onEdit={msg => setInlineMsg({ pos: idx, editId: msg.id, content: msg.content, scheduledTime: msg.scheduledTime, roleMentions: msg.roleMentions || [] })}
+                        />
+                      )}
+                      {/* Inline form after this item */}
+                      {inlineMsg?.pos === idx && (
+                        <div className="bg-[#2f3136] border border-indigo-700 rounded-lg p-3 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-medium text-indigo-300 flex items-center gap-1.5"><MessageSquare size={12}/> {inlineMsg.editId ? 'Edit Message' : 'New Message'}</span>
+                            <button onClick={() => setInlineMsg(null)} className="text-gray-500 hover:text-white"><X size={13}/></button>
+                          </div>
+                          <textarea value={inlineMsg.content} onChange={e => setInlineMsg(p => p ? {...p, content: e.target.value} : p)} placeholder="Message content..." rows={2} className="w-full bg-[#202225] border border-gray-700 rounded p-2 text-white text-sm focus:outline-none focus:border-indigo-500 resize-none"/>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <input type="datetime-local" value={qTsToInput(inlineMsg.scheduledTime)} onChange={e => setInlineMsg(p => p ? {...p, scheduledTime: qInputToTs(e.target.value)} : p)} className="flex-1 min-w-0 bg-[#202225] border border-gray-700 rounded p-1.5 text-white text-xs focus:outline-none focus:border-indigo-500"/>
+                          </div>
+                          {getAvailableRoles(appSettings).length > 0 && (
+                            <div className="flex flex-wrap gap-2">
+                              <span className="text-xs text-gray-500 self-center">Tag:</span>
+                              {getAvailableRoles(appSettings).map(r => {
+                                const sel = (inlineMsg.roleMentions || []).some(x => x.id === r.id);
+                                return <button key={r.id} type="button" onClick={() => setInlineMsg(p => p ? {...p, roleMentions: sel ? p.roleMentions.filter(x => x.id !== r.id) : [...p.roleMentions, {id: r.id, name: r.name}]} : p)} className={`text-xs px-2 py-0.5 rounded border transition-colors ${sel ? 'bg-indigo-600/30 border-indigo-500 text-indigo-300' : 'bg-[#202225] border-gray-600 text-gray-400 hover:text-white'}`} title={r.source !== 'Default' ? `${r.source} override` : 'Default role'}>@{r.name}{r.source !== 'Default' ? <span className="ml-1 opacity-50">({r.source})</span> : null}</button>;
+                              })}
+                            </div>
+                          )}
+                          <div className="flex items-center gap-2">
+                            <button onClick={handleSaveInlineMessage} className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs rounded">{inlineMsg.editId ? 'Save' : 'Schedule'}</button>
+                            <button onClick={() => setInlineMsg(null)} className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs rounded">Cancel</button>
+                          </div>
+                        </div>
+                      )}
+                      {/* Add-here divider after this item */}
+                      {(!inlineMsg || inlineMsg.pos !== idx) && (
+                        <div className="flex items-center gap-2 my-0.5">
+                          <div className="flex-1 border-t border-dashed border-gray-700"/>
+                          <button onClick={() => setInlineMsg({ pos: idx, content: '', scheduledTime: suggestTimeAt(idx), roleMentions: [] })} className="flex items-center gap-1 text-xs text-gray-600 hover:text-indigo-400 px-2 py-0.5 rounded border border-dashed border-transparent hover:border-indigo-700 transition-colors">
+                            <Plus size={10}/> message
+                          </button>
+                          <div className="flex-1 border-t border-dashed border-gray-700"/>
+                        </div>
+                      )}
+                    </React.Fragment>
+                  ))}
+                </>
               )}
             </div>
           </>
